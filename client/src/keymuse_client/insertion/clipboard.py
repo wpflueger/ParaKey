@@ -148,25 +148,60 @@ def get_clipboard_text() -> Optional[str]:
         return None
 
     try:
+        user32 = ctypes.windll.user32
+        kernel32 = ctypes.windll.kernel32
+
+        user32.IsClipboardFormatAvailable.argtypes = [wintypes.UINT]
+        user32.IsClipboardFormatAvailable.restype = wintypes.BOOL
+        user32.GetClipboardData.argtypes = [wintypes.UINT]
+        user32.GetClipboardData.restype = wintypes.HANDLE
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalSize.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalSize.restype = ctypes.c_size_t
+        kernel32.lstrlenW.argtypes = [wintypes.LPCWSTR]
+        kernel32.lstrlenW.restype = ctypes.c_int
+
         # Check if text is available
-        if not ctypes.windll.user32.IsClipboardFormatAvailable(CF_UNICODETEXT):
+        if not user32.IsClipboardFormatAvailable(CF_UNICODETEXT):
             return None
 
         # Get clipboard data
-        handle = ctypes.windll.user32.GetClipboardData(CF_UNICODETEXT)
+        handle = user32.GetClipboardData(CF_UNICODETEXT)
         if not handle:
             return None
 
-        # Lock and copy the data
-        ctypes.windll.kernel32.GlobalLock.restype = ctypes.c_wchar_p
-        text_ptr = ctypes.windll.kernel32.GlobalLock(handle)
+        # Lock and copy the data (size-bounded to avoid access violations)
+        text_ptr = kernel32.GlobalLock(handle)
+        if not text_ptr:
+            return None
 
-        if text_ptr:
-            text = str(text_ptr)
-            ctypes.windll.kernel32.GlobalUnlock(handle)
-            return text
+        try:
+            size_bytes = kernel32.GlobalSize(handle)
+            if not size_bytes:
+                return None
 
-        return None
+            # Guard against absurd sizes (corrupt handles or API truncation)
+            if size_bytes > 10 * 1024 * 1024:
+                logger.warning("Clipboard text size too large: %d bytes", size_bytes)
+                return None
+
+            # CF_UNICODETEXT is UTF-16LE with a terminating NUL
+            if size_bytes < 2:
+                return ""
+
+            max_chars = size_bytes // 2
+            text_len = kernel32.lstrlenW(ctypes.cast(text_ptr, wintypes.LPCWSTR))
+            if text_len <= 0:
+                return ""
+
+            if text_len > max_chars:
+                text_len = max_chars
+
+            return ctypes.wstring_at(text_ptr, text_len)
+        finally:
+            kernel32.GlobalUnlock(handle)
 
     finally:
         close_clipboard()
@@ -186,11 +221,11 @@ def set_clipboard_text(text: str) -> bool:
         return False
 
     opened = False
-    for attempt in range(5):
+    for attempt in range(10):
         if open_clipboard():
             opened = True
             break
-        time.sleep(0.02)
+        time.sleep(0.05)
 
     if not opened:
         logger.error("Failed to open clipboard for writing")
@@ -202,11 +237,26 @@ def set_clipboard_text(text: str) -> bool:
             logger.error("Failed to empty clipboard")
             return False
 
-        # Allocate global memory for the text
-        # Need to add 1 for null terminator, multiply by 2 for Unicode
-        byte_count = (len(text) + 1) * 2
+        kernel32 = ctypes.windll.kernel32
+        user32 = ctypes.windll.user32
 
-        handle = ctypes.windll.kernel32.GlobalAlloc(
+        kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalLock.restype = ctypes.c_void_p
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.restype = wintypes.BOOL
+        kernel32.GlobalFree.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalFree.restype = wintypes.HGLOBAL
+        user32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+        user32.SetClipboardData.restype = wintypes.HANDLE
+
+        # Copy the text as UTF-16LE bytes for CF_UNICODETEXT
+        encoded = text.encode("utf-16-le") + b"\x00\x00"
+        byte_count = len(encoded)
+
+        # Allocate global memory for the text
+        handle = kernel32.GlobalAlloc(
             0x0042,  # GMEM_MOVEABLE | GMEM_ZEROINIT
             byte_count,
         )
@@ -216,28 +266,26 @@ def set_clipboard_text(text: str) -> bool:
             return False
 
         # Lock and copy the text
-        ctypes.windll.kernel32.GlobalLock.restype = ctypes.c_void_p
-        locked_ptr = ctypes.windll.kernel32.GlobalLock(handle)
+        locked_ptr = kernel32.GlobalLock(handle)
 
         if not locked_ptr:
-            ctypes.windll.kernel32.GlobalFree(handle)
+            kernel32.GlobalFree(handle)
             logger.error("Failed to lock clipboard memory")
             return False
 
-        # Copy the text (as wide characters)
         ctypes.memmove(
             locked_ptr,
-            ctypes.c_wchar_p(text),
+            encoded,
             byte_count,
         )
 
-        ctypes.windll.kernel32.GlobalUnlock(handle)
+        kernel32.GlobalUnlock(handle)
 
         # Set the clipboard data
-        result = ctypes.windll.user32.SetClipboardData(CF_UNICODETEXT, handle)
+        result = user32.SetClipboardData(CF_UNICODETEXT, handle)
 
         if not result:
-            ctypes.windll.kernel32.GlobalFree(handle)
+            kernel32.GlobalFree(handle)
             logger.error("Failed to set clipboard data")
             return False
 
