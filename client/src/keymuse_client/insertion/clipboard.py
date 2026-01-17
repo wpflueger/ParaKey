@@ -191,15 +191,25 @@ def get_clipboard_text() -> Optional[str]:
             if size_bytes < 2:
                 return ""
 
-            max_chars = size_bytes // 2
-            text_len = kernel32.lstrlenW(ctypes.cast(text_ptr, wintypes.LPCWSTR))
-            if text_len <= 0:
+            # Read only the allocated size to avoid AVs from lstrlenW on bad pointers
+            raw = ctypes.string_at(text_ptr, size_bytes)
+            # Trim at first UTF-16 NUL terminator (must be 2-byte aligned)
+            terminator = -1
+            for i in range(0, len(raw) - 1, 2):
+                if raw[i : i + 2] == b"\x00\x00":
+                    terminator = i
+                    break
+            if terminator != -1:
+                raw = raw[:terminator]
+
+            if not raw:
                 return ""
 
-            if text_len > max_chars:
-                text_len = max_chars
+            # Ensure even length for UTF-16 decoding
+            if len(raw) % 2 == 1:
+                raw = raw[:-1]
 
-            return ctypes.wstring_at(text_ptr, text_len)
+            return raw.decode("utf-16-le", errors="replace")
         finally:
             kernel32.GlobalUnlock(handle)
 
