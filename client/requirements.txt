@@ -1,1 +1,8 @@
 grpcio>=1.60.0
+sounddevice>=0.4.6
+numpy>=1.26.0
+pywin32>=306; sys_platform == "win32"
+pystray>=0.19.5
+Pillow>=10.0.0
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

@@ -1,35 +1,165 @@
+"""gRPC server entry point for KeyMuse backend."""
+
+from __future__ import annotations
+
 import asyncio
 import logging
+import signal
+from typing import Optional
 
 import grpc
 
-from keymuse_backend.config import BackendConfig
-from keymuse_proto import dictation_pb2_grpc
+from keymuse_backend.config import BackendConfig, load_config_from_env
 from keymuse_backend.service import DictationService
+from keymuse_proto import dictation_pb2_grpc
+
+logger = logging.getLogger("keymuse.backend")
 
 
-LOGGER = logging.getLogger("keymuse.backend")
+class BackendServer:
+    """KeyMuse backend gRPC server."""
+
+    def __init__(self, config: Optional[BackendConfig] = None) -> None:
+        """Initialize the backend server.
+
+        Args:
+            config: Backend configuration. If None, loads from environment.
+        """
+        self._config = config or load_config_from_env()
+        self._service = DictationService(self._config)
+        self._server: Optional[grpc.aio.Server] = None
+        self._shutdown_event = asyncio.Event()
+
+    @property
+    def config(self) -> BackendConfig:
+        """Get the server configuration."""
+        return self._config
+
+    @property
+    def service(self) -> DictationService:
+        """Get the dictation service."""
+        return self._service
+
+    def _create_server(self) -> grpc.aio.Server:
+        """Create and configure the gRPC server."""
+        server = grpc.aio.server()
+        dictation_pb2_grpc.add_DictationServiceServicer_to_server(
+            self._service, server
+        )
+        server.add_insecure_port(f"{self._config.host}:{self._config.port}")
+        return server
+
+    async def start(self) -> None:
+        """Start the backend server.
+
+        This loads the model and starts the gRPC server.
+        """
+        logger.info(f"Starting KeyMuse backend (mode: {self._config.mode})")
+
+        # Load the model
+        logger.info("Loading model...")
+        self._service.load_model()
+        logger.info(f"Model loaded on {self._service.engine.device}")
+
+        # Create and start the server
+        self._server = self._create_server()
+        await self._server.start()
+
+        logger.info(
+            f"Backend listening on {self._config.host}:{self._config.port}"
+        )
+
+    async def stop(self) -> None:
+        """Stop the backend server gracefully."""
+        if self._server is not None:
+            logger.info("Stopping server...")
+
+            # Grace period for in-flight requests
+            await self._server.stop(grace=5.0)
+            self._server = None
+
+        # Unload the model
+        self._service.unload_model()
+        logger.info("Server stopped")
+
+    async def wait_for_termination(self) -> None:
+        """Wait for the server to be terminated."""
+        if self._server is not None:
+            await self._server.wait_for_termination()
+
+    async def run(self) -> None:
+        """Run the server until interrupted.
+
+        This method handles SIGINT and SIGTERM for graceful shutdown.
+        """
+        # Setup signal handlers
+        loop = asyncio.get_event_loop()
+
+        def signal_handler():
+            logger.info("Received shutdown signal")
+            self._shutdown_event.set()
+
+        for sig in (signal.SIGINT, signal.SIGTERM):
+            try:
+                loop.add_signal_handler(sig, signal_handler)
+            except NotImplementedError:
+                # Windows doesn't support add_signal_handler
+                pass
+
+        try:
+            await self.start()
+
+            # Wait for shutdown signal or server termination
+            shutdown_task = asyncio.create_task(self._shutdown_event.wait())
+            wait_task = asyncio.create_task(self.wait_for_termination())
+
+            done, pending = await asyncio.wait(
+                [shutdown_task, wait_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            # Cancel pending tasks
+            for task in pending:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
+
+        finally:
+            await self.stop()
 
 
 def create_server(config: BackendConfig) -> grpc.aio.Server:
+    """Create a gRPC server (legacy compatibility).
+
+    Args:
+        config: Backend configuration.
+
+    Returns:
+        Configured gRPC server.
+    """
+    service = DictationService(config)
+    service.load_model()
+
     server = grpc.aio.server()
-    dictation_pb2_grpc.add_DictationServiceServicer_to_server(
-        DictationService(config), server
-    )
+    dictation_pb2_grpc.add_DictationServiceServicer_to_server(service, server)
     server.add_insecure_port(f"{config.host}:{config.port}")
     return server
 
 
 async def serve_forever() -> None:
-    config = BackendConfig()
-    server = create_server(config)
-    LOGGER.info("Starting backend on %s:%s", config.host, config.port)
-    await server.start()
-    await server.wait_for_termination()
+    """Run the backend server indefinitely."""
+    server = BackendServer()
+    await server.run()
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO)
+    """Main entry point for the backend server."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
     asyncio.run(serve_forever())
 
 

@@ -33,11 +33,11 @@ setup-client:
 
 backend:
 	@echo "Starting backend server..."
-	python -m keymuse_backend.server
+	@bash -c "source $$(pyenv root)/versions/keymuse-backend/bin/activate && python -m keymuse_backend.server"
 
 client:
 	@echo "Starting client app..."
-	python -m keymuse_client.app
+	@bash -c "source $$(pyenv root)/versions/keymuse-client/bin/activate && python -m keymuse_client.app"
 
 test:
 	pytest backend/tests client/tests -v

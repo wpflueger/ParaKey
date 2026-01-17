@@ -65,6 +65,11 @@ make test
 PYTHONPATH=$PWD/shared/src pytest backend/tests client/tests
 ```
 
+## Backend model
+The backend now defaults to the NVIDIA Parakeet TDT model (`nvidia/parakeet-tdt-0.6b-v3`) and
+requires a CUDA-capable GPU with CUDA-enabled PyTorch installed. To run the mock backend
+instead, set `KEYMUSE_MODE=mock` before starting the backend.
+
 ## Windows Client Build (placeholder)
 Build the client on Windows (not WSL):
 
