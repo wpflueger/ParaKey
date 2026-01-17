@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package keymuse.dictation.v1;
+
+service DictationService {
+  rpc StreamAudio (stream AudioFrame) returns (stream DictationEvent);
+  rpc GetHealth (HealthRequest) returns (HealthStatus);
+}
+
+message AudioFrame {
+  bytes audio = 1;
+  uint32 sample_rate_hz = 2;
+  uint32 channels = 3;
+  uint64 sequence = 4;
+  bool end_of_stream = 5;
+}
+
+message DictationEvent {
+  oneof payload {
+    TranscriptPartial partial = 1;
+    TranscriptFinal final = 2;
+    EngineStatus status = 3;
+    ErrorStatus error = 4;
+  }
+}
+
+message TranscriptPartial {
+  string text = 1;
+  float stability = 2;
+}
+
+message TranscriptFinal {
+  string text = 1;
+  bool from_cache = 2;
+}
+
+message EngineStatus {
+  string mode = 1;
+  string detail = 2;
+}
+
+message ErrorStatus {
+  string code = 1;
+  string message = 2;
+}
+
+message HealthRequest {}
+
+message HealthStatus {
+  bool ready = 1;
+  string mode = 2;
+  string detail = 3;
+}
