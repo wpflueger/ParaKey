@@ -32,7 +32,7 @@ The app loads the speech recognition model and starts listening for the hotkey.
 ## How It Works
 
 KeyMuse runs as a single unified app:
-1. Backend (speech recognition) runs in a background thread
+1. Backend (speech recognition) runs in a background process (subprocess)
 2. Client (hotkey detection, audio capture, text insertion) runs in the main thread
 3. Uses NVIDIA Parakeet model for fast, accurate transcription
 
