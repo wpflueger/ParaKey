@@ -72,6 +72,11 @@ def _run_python_check(python_path: Path, check_code: str) -> Optional[str]:
             return result.stdout.strip()
         return None
     except Exception:
+        logger.exception(
+            "Error running Python check with interpreter '%s' and code %r",
+            python_path,
+            check_code,
+        )
         return None
 
 
