@@ -198,7 +198,13 @@ def _find_py_launcher_python() -> Optional[Path]:
                 if path.exists():
                     logger.debug(f"Found Python {version} via py launcher: {path}")
                     return path
-        except Exception:
+        except Exception as exc:
+            logger.debug(
+                "Failed to query Python %s via py launcher: %s",
+                version,
+                exc,
+                exc_info=True,
+            )
             continue
 
     return None
