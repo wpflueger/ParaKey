@@ -37,13 +37,15 @@ KEYEVENTF_UNICODE = 0x0004
 if sys.platform == "win32":
     # Define INPUT structure for SendInput
 
+    ULONG_PTR = wintypes.ULONG_PTR
+
     class KEYBDINPUT(ctypes.Structure):
         _fields_ = [
             ("wVk", wintypes.WORD),
             ("wScan", wintypes.WORD),
             ("dwFlags", wintypes.DWORD),
             ("time", wintypes.DWORD),
-            ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong)),
+            ("dwExtraInfo", ULONG_PTR),
         ]
 
     class INPUT(ctypes.Structure):
@@ -74,7 +76,7 @@ def _create_key_input(
     input_struct.ki.wScan = scan
     input_struct.ki.dwFlags = flags
     input_struct.ki.time = 0
-    input_struct.ki.dwExtraInfo = None
+    input_struct.ki.dwExtraInfo = 0
 
     return input_struct
 
@@ -93,8 +95,19 @@ def send_key_down(vk: int, scan: int = 0) -> bool:
         logger.warning("Keyboard injection not available on this platform")
         return False
 
-    input_struct = _create_key_input(vk, scan, 0)
+    flags = 0
+    if scan:
+        flags |= KEYEVENTF_SCANCODE
+        vk = 0
+    input_struct = _create_key_input(vk, scan, flags)
     inputs = (INPUT * 1)(input_struct)
+
+    ctypes.windll.user32.SendInput.argtypes = [
+        wintypes.UINT,
+        ctypes.POINTER(INPUT),
+        ctypes.c_int,
+    ]
+    ctypes.windll.user32.SendInput.restype = wintypes.UINT
 
     result = ctypes.windll.user32.SendInput(1, inputs, ctypes.sizeof(INPUT))
     return result == 1
@@ -114,8 +127,19 @@ def send_key_up(vk: int, scan: int = 0) -> bool:
         logger.warning("Keyboard injection not available on this platform")
         return False
 
-    input_struct = _create_key_input(vk, scan, KEYEVENTF_KEYUP)
+    flags = KEYEVENTF_KEYUP
+    if scan:
+        flags |= KEYEVENTF_SCANCODE
+        vk = 0
+    input_struct = _create_key_input(vk, scan, flags)
     inputs = (INPUT * 1)(input_struct)
+
+    ctypes.windll.user32.SendInput.argtypes = [
+        wintypes.UINT,
+        ctypes.POINTER(INPUT),
+        ctypes.c_int,
+    ]
+    ctypes.windll.user32.SendInput.restype = wintypes.UINT
 
     result = ctypes.windll.user32.SendInput(1, inputs, ctypes.sizeof(INPUT))
     return result == 1
@@ -216,7 +240,7 @@ def send_unicode_string(text: str, delay_ms: float = 5) -> bool:
         down_input.ki.wScan = ord(char)
         down_input.ki.dwFlags = KEYEVENTF_UNICODE
         down_input.ki.time = 0
-        down_input.ki.dwExtraInfo = None
+        down_input.ki.dwExtraInfo = 0
 
         # Create up event
         up_input = INPUT()
@@ -225,9 +249,16 @@ def send_unicode_string(text: str, delay_ms: float = 5) -> bool:
         up_input.ki.wScan = ord(char)
         up_input.ki.dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP
         up_input.ki.time = 0
-        up_input.ki.dwExtraInfo = None
+        up_input.ki.dwExtraInfo = 0
 
         inputs = (INPUT * 2)(down_input, up_input)
+
+        ctypes.windll.user32.SendInput.argtypes = [
+            wintypes.UINT,
+            ctypes.POINTER(INPUT),
+            ctypes.c_int,
+        ]
+        ctypes.windll.user32.SendInput.restype = wintypes.UINT
 
         result = ctypes.windll.user32.SendInput(2, inputs, ctypes.sizeof(INPUT))
         if result != 2:
