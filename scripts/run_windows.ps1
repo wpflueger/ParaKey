@@ -1,3 +1,4 @@
+# Run KeyMuse - unified speech-to-text app
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -13,14 +14,15 @@ if (-not $env:HF_HOME) {
     $env:HF_HOME = "$repoRoot\.hf_cache"
 }
 
-if (-not $env:KEYMUSE_MODE) {
-    $env:KEYMUSE_MODE = "nemo"
-}
-
-$pythonExe = if ($env:VIRTUAL_ENV) {
-    Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"
+# Find Python - prefer project venv
+$venvPython = Join-Path $repoRoot ".venv\Scripts\python.exe"
+if (Test-Path $venvPython) {
+    $pythonExe = $venvPython
+} elseif ($env:VIRTUAL_ENV) {
+    $pythonExe = Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"
 } else {
-    (Get-Command python -ErrorAction Stop).Source
+    $pythonExe = "python"
 }
 
-& $pythonExe -m keymuse_client.launcher --backend-ready-timeout 300
+# Run the unified app
+& $pythonExe -m keymuse_client.launcher @args

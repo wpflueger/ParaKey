@@ -1,87 +1,134 @@
 # -*- mode: python ; coding: utf-8 -*-
-"""PyInstaller spec file for KeyMuse Windows app."""
+"""PyInstaller spec file for KeyMuse client.
 
-import sys
+This builds a lightweight client-only application (~70MB) that spawns
+the backend as a separate Python subprocess. The backend runs from the
+user's Python installation with torch/CUDA support.
+"""
+
 import os
 from pathlib import Path
 
 block_cipher = None
 
-# Add source paths to sys.path for imports
 repo_root = Path(os.getcwd())
-sys.path.insert(0, str(repo_root / "shared" / "src"))
-sys.path.insert(0, str(repo_root / "backend" / "src"))
-sys.path.insert(0, str(repo_root / "client" / "src"))
 
+# Only include client and shared modules (no backend/torch/nemo)
 a = Analysis(
     [str(repo_root / "client" / "src" / "keymuse_client" / "launcher.py")],
     pathex=[
         str(repo_root / "shared" / "src"),
-        str(repo_root / "backend" / "src"),
         str(repo_root / "client" / "src"),
     ],
     binaries=[],
     datas=[],
     hiddenimports=[
-        "sounddevice",
-        "pywin32",
-        "grpc",
+        # Client modules
         "keymuse_client",
+        "keymuse_client.app",
+        "keymuse_client.config",
+        "keymuse_client.orchestrator",
+        "keymuse_client.grpc_client",
+        "keymuse_client.python_finder",
         "keymuse_client.audio",
         "keymuse_client.audio.capture",
+        "keymuse_client.audio.devices",
         "keymuse_client.hotkeys",
+        "keymuse_client.hotkeys.state_machine",
         "keymuse_client.hotkeys.win32_hook",
         "keymuse_client.insertion",
         "keymuse_client.insertion.keyboard",
-        "keymuse_backend",
-        "keymuse_backend.server",
-        "keymuse_backend.service",
-        "keymuse_backend.engine",
+        "keymuse_client.insertion.clipboard",
+        "keymuse_client.insertion.window",
+        # Proto modules (shared)
         "keymuse_proto",
-        "torch",
-        "nemo",
+        "keymuse_proto.dictation_pb2",
+        "keymuse_proto.dictation_pb2_grpc",
+        # Core dependencies
+        "sounddevice",
+        "grpc",
+        "grpc._cython",
+        "grpc._cython.cygrpc",
+        # Win32 support
+        "win32api",
+        "win32con",
+        "win32gui",
+        "win32clipboard",
+        "pywintypes",
     ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludedimports=[],
+    excludes=[
+        # Exclude ML packages (handled by backend subprocess)
+        "torch",
+        "torchaudio",
+        "torchvision",
+        "nemo",
+        "nemo_toolkit",
+        "pytorch_lightning",
+        "lightning",
+        "lightning_fabric",
+        "transformers",
+        "huggingface_hub",
+        "sentencepiece",
+        "hydra",
+        "omegaconf",
+        # Exclude backend module
+        "keymuse_backend",
+        # Exclude other unnecessary packages
+        "cv2",
+        "opencv",
+        "PIL",
+        "matplotlib",
+        "pandas",
+        "numpy.testing",
+        "scipy",
+        "sklearn",
+        "jupyter",
+        "notebook",
+        "IPython",
+        "pytest",
+        "sphinx",
+        "docutils",
+        "setuptools",
+        "pip",
+        "wheel",
+        "tkinter",
+        "_tkinter",
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
     noarchive=False,
 )
 
-# Include Windows SDK DLLs and audio libraries
-try:
-    import sounddevice
-    sd_path = sounddevice.__path__[0]
-    a.binaries += [(
-        "sounddevice/_sounddevice_platform_windows.pyd",
-        sd_path + "/_sounddevice_platform_windows.pyd",
-        "BINARY",
-    )]
-except Exception:
-    pass
-
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name="KeyMuse",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,
     console=True,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+)
+
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name="KeyMuse",
 )

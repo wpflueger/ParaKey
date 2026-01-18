@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import sys
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -103,7 +102,7 @@ class DictationOrchestrator:
 
         # Configuration flags
         self._use_mock_audio = use_mock_audio
-        self._use_mock_hotkey = use_mock_hotkey or sys.platform != "win32"
+        self._use_mock_hotkey = use_mock_hotkey
 
         # Callbacks
         self._on_state_change: Optional[Callable[[DictationState], None]] = None
@@ -368,7 +367,7 @@ class DictationOrchestrator:
                     return False
 
                 # Try to focus the target window before paste
-                if sys.platform == "win32" and target_window is not None:
+                if target_window is not None:
                     if not set_foreground_window(target_window.hwnd):
                         logger.warning("Failed to focus target window")
 
@@ -383,14 +382,11 @@ class DictationOrchestrator:
                         return False
 
                 # Send Ctrl+V
-                if sys.platform == "win32":
-                    if not send_ctrl_v():
-                        logger.warning("Ctrl+V failed, falling back to Unicode input")
-                        if not send_unicode_string(sanitized):
-                            logger.error("Failed to send Unicode input")
-                            return False
-                else:
-                    logger.info(f"Would insert (non-Windows): {sanitized}")
+                if not send_ctrl_v():
+                    logger.warning("Ctrl+V failed, falling back to Unicode input")
+                    if not send_unicode_string(sanitized):
+                        logger.error("Failed to send Unicode input")
+                        return False
 
                 # Small delay for paste to complete
                 await asyncio.sleep(0.1)

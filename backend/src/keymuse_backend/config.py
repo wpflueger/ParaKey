@@ -38,7 +38,7 @@ def load_config_from_env() -> BackendConfig:
     return BackendConfig(
         host=os.getenv("KEYMUSE_HOST", "127.0.0.1"),
         port=int(os.getenv("KEYMUSE_PORT", "50051")),
-        mode=os.getenv("KEYMUSE_MODE", "mock"),
+        mode=os.getenv("KEYMUSE_MODE", "nemo"),
         model_name=os.getenv(
             "KEYMUSE_MODEL", "nvidia/parakeet-tdt-0.6b-v3"
         ),

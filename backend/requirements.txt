@@ -1,7 +1,7 @@
 grpcio>=1.60.0
 torch>=2.1.0
 nemo-toolkit[asr]>=2.0.0
-sentencepiece==0.1.99
+sentencepiece>=0.1.99
 numpy>=1.26.0
 pytest>=7.0.0
 pytest-asyncio>=0.21.0
