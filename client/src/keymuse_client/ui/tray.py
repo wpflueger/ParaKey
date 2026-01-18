@@ -9,11 +9,15 @@ from __future__ import annotations
 import logging
 import threading
 from enum import Enum, auto
-from typing import Callable, Optional
+from typing import Callable, List, Optional, Tuple
 
 from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
+
+
+# Type alias for history items (text, copy_callback)
+HistoryMenuItem = Tuple[str, Callable[[], None]]
 
 
 class TrayIconState(Enum):
@@ -113,6 +117,9 @@ class SystemTray:
         on_quit: Optional[Callable[[], None]] = None,
         on_settings: Optional[Callable[[], None]] = None,
         on_copy_last: Optional[Callable[[], None]] = None,
+        on_show_window: Optional[Callable[[], None]] = None,
+        get_history: Optional[Callable[[], List[str]]] = None,
+        on_copy_history_item: Optional[Callable[[str], None]] = None,
     ) -> None:
         """Initialize the system tray.
 
@@ -120,10 +127,16 @@ class SystemTray:
             on_quit: Callback when user selects Quit from menu.
             on_settings: Callback when user selects Settings from menu.
             on_copy_last: Callback when user selects Copy Last Transcript.
+            on_show_window: Callback when user double-clicks or selects Show Window.
+            get_history: Callback to get transcript history for submenu.
+            on_copy_history_item: Callback to copy a history item.
         """
         self._on_quit = on_quit
         self._on_settings = on_settings
         self._on_copy_last = on_copy_last
+        self._on_show_window = on_show_window
+        self._get_history = get_history
+        self._on_copy_history_item = on_copy_history_item
         self._state = TrayIconState.IDLE
         self._icon = None
         self._thread: Optional[threading.Thread] = None
@@ -162,6 +175,17 @@ class SystemTray:
 
             menu_items = []
 
+            # Show Window (default action for double-click)
+            if self._on_show_window:
+                menu_items.append(
+                    pystray.MenuItem(
+                        "Show Window",
+                        self._handle_show_window,
+                        default=True,
+                    )
+                )
+                menu_items.append(pystray.Menu.SEPARATOR)
+
             # Status item (disabled, shows current state)
             state_text = {
                 TrayIconState.IDLE: "Ready",
@@ -174,6 +198,14 @@ class SystemTray:
                 pystray.MenuItem(f"Status: {state_text}", None, enabled=False)
             )
             menu_items.append(pystray.Menu.SEPARATOR)
+
+            # History submenu
+            if self._get_history:
+                history_items = self._create_history_submenu()
+                if history_items:
+                    menu_items.append(
+                        pystray.MenuItem("History", pystray.Menu(*history_items))
+                    )
 
             # Copy Last Transcript
             if self._on_copy_last:
@@ -198,6 +230,44 @@ class SystemTray:
             logger.warning("pystray not available")
             return None
 
+    def _create_history_submenu(self):
+        """Create history submenu items.
+
+        Returns:
+            List of pystray.MenuItem for history items.
+        """
+        try:
+            import pystray
+
+            if not self._get_history:
+                return []
+
+            history = self._get_history()
+            if not history:
+                return [pystray.MenuItem("(empty)", None, enabled=False)]
+
+            items = []
+            # Show last 5 items (newest first)
+            for text in reversed(history[-5:]):
+                # Truncate for display
+                display = text[:40] + "..." if len(text) > 40 else text
+                # Replace newlines
+                display = display.replace("\r\n", " ").replace("\n", " ")
+
+                # Create callback for this item
+                def make_callback(t):
+                    def callback(icon, item):
+                        if self._on_copy_history_item:
+                            self._on_copy_history_item(t)
+                    return callback
+
+                items.append(pystray.MenuItem(display, make_callback(text)))
+
+            return items
+
+        except ImportError:
+            return []
+
     def _handle_quit(self, icon, item):
         """Handle Quit menu item."""
         if self._on_quit:
@@ -213,6 +283,11 @@ class SystemTray:
         """Handle Copy Last Transcript menu item."""
         if self._on_copy_last:
             self._on_copy_last()
+
+    def _handle_show_window(self, icon, item):
+        """Handle Show Window menu item or double-click."""
+        if self._on_show_window:
+            self._on_show_window()
 
     def _run_icon(self) -> None:
         """Run the tray icon (in separate thread)."""

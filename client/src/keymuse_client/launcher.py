@@ -27,15 +27,21 @@ if getattr(sys, "frozen", False):
 
     multiprocessing.freeze_support()
 
-from keymuse_client.app import run_interactive, run_once
 from keymuse_client.config import ClientConfig
 from keymuse_client.grpc_client import DictationClient
+from keymuse_client.insertion.clipboard import (
+    get_last_transcript,
+    get_transcript_history,
+    set_clipboard_text,
+)
+from keymuse_client.orchestrator import DictationOrchestrator, DictationState
 from keymuse_client.python_finder import (
     BackendDepsError,
     PythonInfo,
     PythonNotFoundError,
     find_python,
 )
+from keymuse_client.ui.tray import SystemTray, TrayIconState
 
 logger = logging.getLogger("keymuse")
 
@@ -96,25 +102,6 @@ def _cleanup_backend() -> None:
             _backend_process = None
 
 
-def _stream_backend_output(process: subprocess.Popen) -> None:
-    """Stream backend output to console in a background thread."""
-    global _stop_output_thread
-
-    if process.stdout is None:
-        return
-
-    try:
-        for line in iter(process.stdout.readline, ""):
-            if _stop_output_thread:
-                break
-            if line:
-                # Print backend output with prefix
-                print(f"[backend] {line.rstrip()}")
-                sys.stdout.flush()
-    except Exception:
-        pass  # Process closed
-
-
 def start_backend_subprocess(
     python_info: PythonInfo,
     host: str = "127.0.0.1",
@@ -122,6 +109,7 @@ def start_backend_subprocess(
     mode: Optional[str] = None,
     device: Optional[str] = None,
     model: Optional[str] = None,
+    on_output: Optional[callable] = None,
 ) -> subprocess.Popen:
     """Start the backend as a subprocess.
 
@@ -132,6 +120,7 @@ def start_backend_subprocess(
         mode: Backend mode (mock, nemo).
         device: Device to use (cuda, cpu).
         model: Model name override.
+        on_output: Optional callback for each line of output.
 
     Returns:
         The subprocess.Popen object.
@@ -187,9 +176,24 @@ def start_backend_subprocess(
         _stop_output_thread = False
 
         # Start background thread to stream output
-        _output_thread = threading.Thread(
-            target=_stream_backend_output, args=(process,), daemon=True
-        )
+        def stream_output():
+            global _stop_output_thread
+            if process.stdout is None:
+                return
+            try:
+                for line in iter(process.stdout.readline, ""):
+                    if _stop_output_thread:
+                        break
+                    if line:
+                        line_text = line.rstrip()
+                        print(f"[backend] {line_text}")
+                        sys.stdout.flush()
+                        if on_output:
+                            on_output(line_text)
+            except Exception:
+                pass
+
+        _output_thread = threading.Thread(target=stream_output, daemon=True)
         _output_thread.start()
 
         # Register cleanup
@@ -296,11 +300,348 @@ def parse_args() -> argparse.Namespace:
         help="Path to Python executable for backend (overrides auto-detect)",
     )
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
+    parser.add_argument(
+        "--no-gui",
+        action="store_true",
+        help="Run without GUI (console only)",
+    )
     return parser.parse_args()
 
 
-async def run_app() -> None:
-    """Run the KeyMuse application."""
+class KeyMuseApp:
+    """Main KeyMuse application with UI."""
+
+    def __init__(self, args: argparse.Namespace) -> None:
+        """Initialize the application.
+
+        Args:
+            args: Parsed command line arguments.
+        """
+        self._args = args
+        self._root = None
+        self._startup_window = None
+        self._main_window = None
+        self._tray = None
+        self._async_bridge = None
+        self._orchestrator: Optional[DictationOrchestrator] = None
+        self._shutdown_event: Optional[asyncio.Event] = None
+        self._python_info: Optional[PythonInfo] = None
+        self._backend_process: Optional[subprocess.Popen] = None
+
+    def run(self) -> int:
+        """Run the application.
+
+        Returns:
+            Exit code.
+        """
+        import tkinter as tk
+
+        from keymuse_client.ui.async_bridge import TkAsyncBridge
+        from keymuse_client.ui.main_window import MainWindow
+        from keymuse_client.ui.startup_window import StartupWindow
+        from keymuse_client.ui.theme import configure_ttk_style
+
+        # Create hidden root window
+        self._root = tk.Tk()
+        self._root.withdraw()
+
+        # Configure styles on root
+        configure_ttk_style(self._root)
+
+        # Show startup window
+        self._startup_window = StartupWindow(
+            self._root,
+            on_cancel=self._handle_cancel,
+        )
+        self._startup_window.set_status("Initializing...")
+
+        # Create async bridge and start event loop
+        self._async_bridge = TkAsyncBridge(self._root)
+        self._async_bridge.start_async_loop()
+
+        # Schedule startup in async loop
+        self._async_bridge.run_async(
+            self._startup_async(),
+            callback=self._on_startup_complete,
+            error_callback=self._on_startup_error,
+        )
+
+        # Run tkinter main loop
+        try:
+            self._root.mainloop()
+            return 0
+        except Exception as e:
+            logger.error(f"Application error: {e}")
+            return 1
+        finally:
+            self._cleanup()
+
+    async def _startup_async(self) -> bool:
+        """Async startup sequence.
+
+        Returns:
+            True if startup succeeded.
+        """
+        args = self._args
+
+        # Find Python
+        self._schedule_ui(
+            lambda: self._startup_window.set_status("Finding Python environment...")
+        )
+
+        try:
+            if args.python:
+                from keymuse_client.python_finder import check_backend_deps
+                self._python_info = check_backend_deps(Path(args.python))
+            else:
+                self._python_info = find_python(check_deps=True)
+
+            version_msg = f"Python {self._python_info.version}"
+            if self._python_info.has_cuda:
+                version_msg += " (CUDA)"
+            else:
+                version_msg += " (CPU)"
+
+            self._schedule_ui(lambda: self._startup_window.append_log(version_msg))
+
+        except PythonNotFoundError as e:
+            raise RuntimeError(f"Python not found: {e}")
+        except BackendDepsError as e:
+            raise RuntimeError(f"Missing dependencies: {e}")
+
+        # Start backend
+        self._schedule_ui(
+            lambda: self._startup_window.set_status("Starting backend server...")
+        )
+
+        def on_backend_output(line: str):
+            # Only append to startup window if it still exists
+            def append_if_exists():
+                if self._startup_window is not None:
+                    self._startup_window.append_log(line)
+            self._schedule_ui(append_if_exists)
+
+        self._backend_process = start_backend_subprocess(
+            self._python_info,
+            host=args.host,
+            port=args.port,
+            mode=args.mode,
+            device=args.device,
+            model=args.model,
+            on_output=on_backend_output,
+        )
+
+        # Wait for backend health
+        self._schedule_ui(
+            lambda: self._startup_window.set_status("Loading speech recognition model...")
+        )
+
+        await wait_for_backend_health(
+            args.host,
+            args.port,
+            timeout_s=args.timeout,
+            process=self._backend_process,
+        )
+
+        return True
+
+    def _schedule_ui(self, callback: callable) -> None:
+        """Schedule a callback on the UI thread."""
+        if self._async_bridge:
+            self._async_bridge.schedule_ui_update(callback)
+
+    def _on_startup_complete(self, result: bool) -> None:
+        """Called when startup completes successfully."""
+        if self._startup_window:
+            self._startup_window.show_success()
+            # Close startup window after brief delay
+            self._root.after(500, self._show_main_window)
+
+    def _on_startup_error(self, error: Exception) -> None:
+        """Called when startup fails."""
+        error_msg = str(error)
+        logger.error(f"Startup failed: {error_msg}")
+
+        if self._startup_window:
+            self._startup_window.show_error(error_msg)
+
+    def _show_main_window(self) -> None:
+        """Show the main window and start the orchestrator."""
+        from keymuse_client.ui.main_window import MainWindow
+        from keymuse_client.settings import get_settings_manager
+
+        # Close startup window
+        if self._startup_window:
+            self._startup_window.close()
+            self._startup_window = None
+
+        # Create main window
+        self._main_window = MainWindow(
+            self._root,
+            on_settings=self._handle_settings,
+            on_minimize_to_tray=self._handle_minimize_to_tray,
+            on_quit=self._handle_quit,
+        )
+        self._main_window.set_on_copy(self._handle_copy)
+
+        # Create system tray
+        self._tray = SystemTray(
+            on_quit=self._handle_quit,
+            on_settings=self._handle_settings,
+            on_copy_last=self._handle_copy_last,
+            on_show_window=self._handle_show_window,
+            get_history=get_transcript_history,
+            on_copy_history_item=self._handle_copy,
+        )
+        self._tray.start()
+
+        # Start orchestrator
+        self._async_bridge.run_async(
+            self._start_orchestrator(),
+            error_callback=lambda e: logger.error(f"Orchestrator error: {e}"),
+        )
+
+        # Check if should start minimized
+        settings = get_settings_manager().settings
+        if settings.start_minimized:
+            self._main_window.hide()
+        else:
+            self._main_window.show()
+
+    async def _start_orchestrator(self) -> None:
+        """Start the dictation orchestrator."""
+        args = self._args
+
+        config = ClientConfig(
+            backend_host=args.host,
+            backend_port=args.port,
+        )
+
+        self._orchestrator = DictationOrchestrator(config)
+        self._shutdown_event = asyncio.Event()
+
+        # Set up callbacks (wrapped for thread safety)
+        def on_state(state: DictationState):
+            self._schedule_ui(lambda: self._update_state(state))
+
+        def on_partial(text: str):
+            pass  # Could update UI with partial text
+
+        def on_final(text: str):
+            self._schedule_ui(lambda: self._on_transcript(text))
+
+        def on_error(error: str):
+            self._schedule_ui(lambda: self._on_error(error))
+
+        self._orchestrator.set_callbacks(
+            on_state_change=on_state,
+            on_partial=on_partial,
+            on_final=on_final,
+            on_error=on_error,
+        )
+
+        await self._orchestrator.start()
+
+        # Update UI to ready state
+        self._schedule_ui(lambda: self._main_window.set_all_ready() if self._main_window else None)
+
+        # Wait for shutdown
+        await self._shutdown_event.wait()
+
+        # Stop orchestrator
+        await self._orchestrator.stop()
+
+    def _update_state(self, state: DictationState) -> None:
+        """Update UI state from orchestrator state."""
+        if self._main_window:
+            self._main_window.update_dictation_state(state.name)
+
+        # Map to tray icon state
+        tray_state_map = {
+            DictationState.IDLE: TrayIconState.IDLE,
+            DictationState.RECORDING: TrayIconState.RECORDING,
+            DictationState.PROCESSING: TrayIconState.PROCESSING,
+            DictationState.INSERTING: TrayIconState.PROCESSING,
+            DictationState.ERROR: TrayIconState.ERROR,
+        }
+        if self._tray:
+            self._tray.set_state(tray_state_map.get(state, TrayIconState.IDLE))
+
+    def _on_transcript(self, text: str) -> None:
+        """Handle new transcript."""
+        if self._main_window:
+            self._main_window.add_transcript(text)
+
+    def _on_error(self, error: str) -> None:
+        """Handle error."""
+        logger.error(f"Dictation error: {error}")
+        if self._tray:
+            self._tray.show_notification("KeyMuse Error", error)
+
+    def _handle_settings(self) -> None:
+        """Handle settings button/menu."""
+        from keymuse_client.settings import show_settings_dialog
+        # Schedule on main thread
+        self._root.after(0, lambda: show_settings_dialog(self._main_window))
+
+    def _handle_minimize_to_tray(self) -> None:
+        """Handle minimize to tray."""
+        if self._tray:
+            self._tray.show_notification("KeyMuse", "Minimized to tray")
+
+    def _handle_show_window(self) -> None:
+        """Handle show window request from tray."""
+        self._schedule_ui(lambda: self._main_window.show() if self._main_window else None)
+
+    def _handle_copy(self, text: str) -> None:
+        """Handle copy request."""
+        if set_clipboard_text(text):
+            if self._tray:
+                self._tray.show_notification("KeyMuse", "Copied to clipboard")
+
+    def _handle_copy_last(self) -> None:
+        """Handle copy last transcript."""
+        last = get_last_transcript()
+        if last:
+            self._handle_copy(last)
+
+    def _handle_cancel(self) -> None:
+        """Handle cancel during startup."""
+        self._handle_quit()
+
+    def _handle_quit(self) -> None:
+        """Handle quit request."""
+        logger.info("Quit requested")
+
+        # Signal shutdown
+        if self._shutdown_event:
+            if self._async_bridge and self._async_bridge.loop:
+                self._async_bridge.loop.call_soon_threadsafe(self._shutdown_event.set)
+
+        # Stop tray
+        if self._tray:
+            self._tray.stop()
+
+        # Quit tkinter
+        if self._root:
+            self._root.after(100, self._root.quit)
+
+    def _cleanup(self) -> None:
+        """Clean up resources."""
+        logger.info("Cleaning up...")
+
+        # Stop async loop
+        if self._async_bridge:
+            self._async_bridge.stop_async_loop()
+
+        # Clean up backend
+        _cleanup_backend()
+
+
+async def run_app_console() -> None:
+    """Run the KeyMuse application in console mode (no GUI)."""
+    from keymuse_client.app import run_interactive, run_once
+
     args = parse_args()
 
     # Configure logging
@@ -319,9 +660,7 @@ async def run_app() -> None:
     print("Locating Python environment...")
     try:
         if args.python:
-            # Use specified Python
             from keymuse_client.python_finder import check_backend_deps
-
             python_info = check_backend_deps(Path(args.python))
         else:
             python_info = find_python(check_deps=True)
@@ -388,7 +727,6 @@ async def run_app() -> None:
     except KeyboardInterrupt:
         print("\nShutting down...")
     except RuntimeError as e:
-        # Backend startup failure - show output
         print(f"Error: {e}")
         sys.exit(1)
     except Exception as e:
@@ -401,6 +739,15 @@ async def run_app() -> None:
 
 def main() -> None:
     """Main entry point."""
+    args = parse_args()
+
+    # Configure logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
+
     # Handle Ctrl+C gracefully
     def signal_handler(*_args):
         print("\nInterrupted, cleaning up...")
@@ -411,12 +758,23 @@ def main() -> None:
     if sys.platform == "win32":
         signal.signal(signal.SIGBREAK, signal_handler)
 
-    try:
-        asyncio.run(run_app())
-    except KeyboardInterrupt:
-        # KeyboardInterrupt is already handled inside run_app(); suppress it here
-        # to avoid an extra traceback and allow a clean, quiet shutdown.
-        pass
+    # Check for GUI mode
+    if args.no_gui:
+        try:
+            asyncio.run(run_app_console())
+        except KeyboardInterrupt:
+            pass
+    else:
+        try:
+            app = KeyMuseApp(args)
+            sys.exit(app.run())
+        except ImportError as e:
+            # Fall back to console mode if tkinter not available
+            logger.warning(f"GUI not available ({e}), falling back to console mode")
+            try:
+                asyncio.run(run_app_console())
+            except KeyboardInterrupt:
+                pass
 
 
 if __name__ == "__main__":

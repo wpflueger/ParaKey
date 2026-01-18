@@ -224,8 +224,11 @@ def get_settings_manager() -> SettingsManager:
     return _settings_manager
 
 
-def show_settings_dialog() -> bool:
+def show_settings_dialog(parent=None) -> bool:
     """Show the settings dialog.
+
+    Args:
+        parent: Optional parent window. If provided, dialog will be modal.
 
     Returns:
         True if settings were changed.
@@ -238,14 +241,37 @@ def show_settings_dialog() -> bool:
         settings = manager.settings
         changed = [False]
 
-        # Create dialog
-        root = tk.Tk()
-        root.title("KeyMuse Settings")
-        root.geometry("400x350")
-        root.resizable(False, False)
+        # Create dialog as Toplevel if parent provided, otherwise standalone
+        if parent is not None:
+            dialog = tk.Toplevel(parent)
+            dialog.transient(parent)  # Stay on top of parent
+            dialog.grab_set()  # Make modal
+        else:
+            dialog = tk.Tk()
+
+        dialog.title("KeyMuse Settings")
+        dialog.geometry("400x350")
+        dialog.resizable(False, False)
+
+        # Center on parent or screen
+        dialog.update_idletasks()
+        if parent is not None:
+            x = parent.winfo_x() + (parent.winfo_width() - 400) // 2
+            y = parent.winfo_y() + (parent.winfo_height() - 350) // 2
+            dialog.geometry(f"+{x}+{y}")
+
+        # Configure background
+        dialog.configure(bg="#1E1E1E")
+
+        # Try to configure ttk styles
+        try:
+            from keymuse_client.ui.theme import configure_ttk_style
+            configure_ttk_style(dialog)
+        except ImportError:
+            pass
 
         # Create notebook for tabs
-        notebook = ttk.Notebook(root)
+        notebook = ttk.Notebook(dialog)
         notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
         # Audio tab
@@ -325,7 +351,7 @@ def show_settings_dialog() -> bool:
         ).grid(row=1, column=0, sticky="w", pady=5)
 
         # Buttons
-        button_frame = ttk.Frame(root)
+        button_frame = ttk.Frame(dialog)
         button_frame.pack(fill="x", padx=10, pady=10)
 
         def save_and_close():
@@ -344,16 +370,24 @@ def show_settings_dialog() -> bool:
 
             manager.save()
             changed[0] = True
-            root.destroy()
+            dialog.destroy()
 
         def cancel():
-            root.destroy()
+            dialog.destroy()
 
         ttk.Button(button_frame, text="Save", command=save_and_close).pack(side="right", padx=5)
         ttk.Button(button_frame, text="Cancel", command=cancel).pack(side="right")
 
+        # Handle window close button
+        dialog.protocol("WM_DELETE_WINDOW", cancel)
+
         # Run dialog
-        root.mainloop()
+        if parent is not None:
+            # Wait for dialog to close before returning
+            parent.wait_window(dialog)
+        else:
+            dialog.mainloop()
+
         return changed[0]
 
     except ImportError:
