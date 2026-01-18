@@ -189,7 +189,10 @@ class ModelLoader:
             transcripts = self._model.transcribe([audio_float])
 
         if transcripts and len(transcripts) > 0:
-            return transcripts[0]
+            first = transcripts[0]
+            if hasattr(first, "text"):
+                return str(first.text)
+            return str(first)
         return ""
 
     def transcribe_file(self, audio_path: str) -> str:
@@ -211,7 +214,10 @@ class ModelLoader:
             transcripts = self._model.transcribe([audio_path])
 
         if transcripts and len(transcripts) > 0:
-            return transcripts[0]
+            first = transcripts[0]
+            if hasattr(first, "text"):
+                return str(first.text)
+            return str(first)
         return ""
 
     def get_model(self):

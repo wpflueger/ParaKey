@@ -81,6 +81,26 @@ def _create_key_input(
     return input_struct
 
 
+def _send_input(inputs: "INPUT", count: int) -> bool:
+    ctypes.windll.user32.SendInput.argtypes = [
+        wintypes.UINT,
+        ctypes.POINTER(INPUT),
+        ctypes.c_int,
+    ]
+    ctypes.windll.user32.SendInput.restype = wintypes.UINT
+
+    result = ctypes.windll.user32.SendInput(
+        count,
+        inputs,
+        ctypes.sizeof(INPUT),
+    )
+    if result != count:
+        error = ctypes.get_last_error()
+        logger.error("SendInput failed (sent=%s, error=%s)", result, error)
+        return False
+    return True
+
+
 def send_key_down(vk: int, scan: int = 0) -> bool:
     """Send a key down event.
 
@@ -95,22 +115,19 @@ def send_key_down(vk: int, scan: int = 0) -> bool:
         logger.warning("Keyboard injection not available on this platform")
         return False
 
-    flags = 0
-    if scan:
-        flags |= KEYEVENTF_SCANCODE
-        vk = 0
-    input_struct = _create_key_input(vk, scan, flags)
+    if scan == 0:
+        try:
+            ctypes.windll.user32.keybd_event(vk, 0, 0, 0)
+            return True
+        except Exception as e:
+            logger.error("keybd_event failed: %s", e)
+            return False
+
+    flags = KEYEVENTF_SCANCODE
+    input_struct = _create_key_input(0, scan, flags)
     inputs = (INPUT * 1)(input_struct)
 
-    ctypes.windll.user32.SendInput.argtypes = [
-        wintypes.UINT,
-        ctypes.POINTER(INPUT),
-        ctypes.c_int,
-    ]
-    ctypes.windll.user32.SendInput.restype = wintypes.UINT
-
-    result = ctypes.windll.user32.SendInput(1, inputs, ctypes.sizeof(INPUT))
-    return result == 1
+    return _send_input(inputs, 1)
 
 
 def send_key_up(vk: int, scan: int = 0) -> bool:
@@ -127,22 +144,19 @@ def send_key_up(vk: int, scan: int = 0) -> bool:
         logger.warning("Keyboard injection not available on this platform")
         return False
 
-    flags = KEYEVENTF_KEYUP
-    if scan:
-        flags |= KEYEVENTF_SCANCODE
-        vk = 0
-    input_struct = _create_key_input(vk, scan, flags)
+    if scan == 0:
+        try:
+            ctypes.windll.user32.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0)
+            return True
+        except Exception as e:
+            logger.error("keybd_event failed: %s", e)
+            return False
+
+    flags = KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP
+    input_struct = _create_key_input(0, scan, flags)
     inputs = (INPUT * 1)(input_struct)
 
-    ctypes.windll.user32.SendInput.argtypes = [
-        wintypes.UINT,
-        ctypes.POINTER(INPUT),
-        ctypes.c_int,
-    ]
-    ctypes.windll.user32.SendInput.restype = wintypes.UINT
-
-    result = ctypes.windll.user32.SendInput(1, inputs, ctypes.sizeof(INPUT))
-    return result == 1
+    return _send_input(inputs, 1)
 
 
 def send_key_press(vk: int, scan: int = 0, delay_ms: float = 10) -> bool:
@@ -178,28 +192,28 @@ def send_ctrl_v(delay_ms: float = 10) -> bool:
 
     try:
         # Press Ctrl
-        if not send_key_down(VK_CONTROL, SCAN_CONTROL):
+        if not send_key_down(VK_CONTROL):
             logger.error("Failed to send Ctrl down")
             return False
 
         time.sleep(delay_ms / 1000)
 
         # Press V
-        if not send_key_down(VK_V, SCAN_V):
+        if not send_key_down(VK_V):
             logger.error("Failed to send V down")
-            send_key_up(VK_CONTROL, SCAN_CONTROL)  # Release Ctrl
+            send_key_up(VK_CONTROL)  # Release Ctrl
             return False
 
         time.sleep(delay_ms / 1000)
 
         # Release V
-        if not send_key_up(VK_V, SCAN_V):
+        if not send_key_up(VK_V):
             logger.error("Failed to send V up")
 
         time.sleep(delay_ms / 1000)
 
         # Release Ctrl
-        if not send_key_up(VK_CONTROL, SCAN_CONTROL):
+        if not send_key_up(VK_CONTROL):
             logger.error("Failed to send Ctrl up")
             return False
 
@@ -208,8 +222,8 @@ def send_ctrl_v(delay_ms: float = 10) -> bool:
     except Exception as e:
         logger.error(f"Error sending Ctrl+V: {e}")
         # Try to release any held keys
-        send_key_up(VK_V, SCAN_V)
-        send_key_up(VK_CONTROL, SCAN_CONTROL)
+        send_key_up(VK_V)
+        send_key_up(VK_CONTROL)
         return False
 
 
@@ -253,15 +267,7 @@ def send_unicode_string(text: str, delay_ms: float = 5) -> bool:
 
         inputs = (INPUT * 2)(down_input, up_input)
 
-        ctypes.windll.user32.SendInput.argtypes = [
-            wintypes.UINT,
-            ctypes.POINTER(INPUT),
-            ctypes.c_int,
-        ]
-        ctypes.windll.user32.SendInput.restype = wintypes.UINT
-
-        result = ctypes.windll.user32.SendInput(2, inputs, ctypes.sizeof(INPUT))
-        if result != 2:
+        if not _send_input(inputs, 2):
             success = False
 
         if delay_ms > 0:

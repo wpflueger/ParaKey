@@ -16,7 +16,10 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Deque, Optional
+
+from collections import deque
+import threading
 
 from keymuse_client.app import check_health, run_interactive, run_once
 from keymuse_client.config import ClientConfig
@@ -50,8 +53,10 @@ def _start_backend(
     mode: Optional[str],
     device: Optional[str],
     model: Optional[str],
-) -> subprocess.Popen:
+) -> tuple[subprocess.Popen, Deque[str]]:
     env = os.environ.copy()
+    if not env.get("HF_HOME"):
+        env["HF_HOME"] = str(_repo_root() / ".hf_cache")
     env["PYTHONPATH"] = _build_pythonpath()
     env["PYTHONUNBUFFERED"] = "1"
     env["KEYMUSE_HOST"] = host
@@ -64,10 +69,27 @@ def _start_backend(
         env["KEYMUSE_MODEL"] = model
 
     logger.info("Starting backend process")
-    return subprocess.Popen(
+    process = subprocess.Popen(
         [sys.executable, "-m", "keymuse_backend.server"],
         env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
     )
+    output_buffer: Deque[str] = deque(maxlen=200)
+
+    def _reader() -> None:
+        if process.stdout is None:
+            return
+        for line in process.stdout:
+            output_buffer.append(line.rstrip())
+            logger.info("[backend] %s", line.rstrip())
+
+    thread = threading.Thread(target=_reader, daemon=True)
+    thread.start()
+
+    return process, output_buffer
 
 
 async def _wait_for_backend_ready(
@@ -77,13 +99,17 @@ async def _wait_for_backend_ready(
     timeout_s: float,
     poll_s: float,
     backend_process: subprocess.Popen,
+    backend_output: Deque[str],
 ) -> None:
     deadline = time.monotonic() + timeout_s
     last_error: Optional[str] = None
 
     while time.monotonic() < deadline:
         if backend_process.poll() is not None:
-            raise RuntimeError("Backend process exited early")
+            tail = "\n".join(backend_output)
+            raise RuntimeError(
+                "Backend process exited early. Recent output:\n" + tail
+            )
 
         client = DictationClient(host, port)
         try:
@@ -140,7 +166,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--backend-ready-timeout",
         type=float,
-        default=30.0,
+        default=180.0,
         help="Seconds to wait for backend readiness",
     )
     parser.add_argument(
@@ -167,7 +193,7 @@ async def run_supervised() -> None:
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     )
 
-    backend_process = _start_backend(
+    backend_process, backend_output = _start_backend(
         host=args.host,
         port=args.port,
         mode=args.backend_mode,
@@ -182,6 +208,7 @@ async def run_supervised() -> None:
             timeout_s=args.backend_ready_timeout,
             poll_s=args.backend_ready_poll,
             backend_process=backend_process,
+            backend_output=backend_output,
         )
 
         config = ClientConfig(

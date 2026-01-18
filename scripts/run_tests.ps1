@@ -9,18 +9,10 @@ $env:PYTHONPATH = @(
     "$repoRoot\client\src"
 ) -join ";"
 
-if (-not $env:HF_HOME) {
-    $env:HF_HOME = "$repoRoot\.hf_cache"
-}
-
-if (-not $env:KEYMUSE_MODE) {
-    $env:KEYMUSE_MODE = "nemo"
-}
-
 $pythonExe = if ($env:VIRTUAL_ENV) {
     Join-Path $env:VIRTUAL_ENV "Scripts\python.exe"
 } else {
     (Get-Command python -ErrorAction Stop).Source
 }
 
-& $pythonExe -m keymuse_client.launcher --backend-ready-timeout 300
+& $pythonExe -m pytest -v backend\tests client\tests
