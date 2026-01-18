@@ -234,8 +234,11 @@ async def wait_for_backend_health(
                 if process.stdout:
                     try:
                         stderr_output = process.stdout.read()
-                    except Exception:
-                        pass
+                    except Exception as read_error:
+                        logging.getLogger(__name__).warning(
+                            "Failed to read backend process stdout before exit: %s",
+                            read_error,
+                        )
                 raise RuntimeError(
                     f"Backend process exited with code {ret}\n{stderr_output}"
                 )
