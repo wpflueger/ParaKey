@@ -1,6 +1,27 @@
 # KeyMuse
 Speech to text app
 
+## Quick Start (Windows)
+
+Requires Python 3.11+ on Windows.
+
+### First-time setup
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+pip install -r client\requirements.txt
+pip install -r shared\requirements.txt
+```
+
+### Run the app (single entrypoint, two managed processes)
+```powershell
+scripts\run_windows.ps1
+```
+
+This starts the backend service in a managed subprocess and then launches
+the client in the same console for a single-app experience on Windows.
+
 ## Quick Start (WSL)
 
 Requires Python 3.11+ and [pyenv](https://github.com/pyenv/pyenv) with [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv).
@@ -70,14 +91,16 @@ The backend now defaults to the NVIDIA Parakeet TDT model (`nvidia/parakeet-tdt-
 requires a CUDA-capable GPU with CUDA-enabled PyTorch installed. To run the mock backend
 instead, set `KEYMUSE_MODE=mock` before starting the backend.
 
-## Windows Client Build (placeholder)
-Build the client on Windows (not WSL):
+## Windows Build (two managed processes)
+Build the app on Windows (not WSL):
 
 ```powershell
 py -3.11 -m venv .venv
 .venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
 pip install -r client\requirements.txt
-$env:PYTHONPATH="shared\src"
+pip install -r shared\requirements.txt
+$env:PYTHONPATH="shared\src;backend\src;client\src"
 pytest client\tests -m "windows_only"
-pyinstaller client\src\keymuse_client\app.py --onefile --noconsole
+pyinstaller client\src\keymuse_client\launcher.py --onefile --noconsole
 ```

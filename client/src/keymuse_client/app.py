@@ -27,13 +27,13 @@ from keymuse_proto import dictation_pb2
 logger = logging.getLogger("keymuse.client")
 
 
-async def run_once() -> None:
+async def run_once(config: ClientConfig | None = None) -> None:
     """Run a single dictation session (legacy mode).
 
     This is the original behavior that streams mock audio to the backend
     and logs the results. Used for testing the gRPC connection.
     """
-    config = ClientConfig()
+    config = config or ClientConfig()
     client = DictationClient(config.backend_host, config.backend_port)
     capture = default_capture(config)
 
@@ -52,7 +52,7 @@ async def run_once() -> None:
     await client.close()
 
 
-async def run_interactive() -> None:
+async def run_interactive(config: ClientConfig | None = None) -> None:
     """Run in interactive mode with hotkey detection.
 
     This is the main operation mode that:
@@ -61,7 +61,7 @@ async def run_interactive() -> None:
     - Streams to backend for transcription
     - Pastes result into active application
     """
-    config = ClientConfig()
+    config = config or ClientConfig()
 
     # Determine if we should use mocks based on platform
     use_mock_audio = sys.platform != "win32"
@@ -118,7 +118,11 @@ async def run_interactive() -> None:
             pass
 
     # Start the orchestrator
-    await orchestrator.start()
+    try:
+        await orchestrator.start()
+    except Exception as e:
+        logger.error(f"Failed to start orchestrator: {e}")
+        return
 
     print("\n" + "=" * 50)
     print("KeyMuse Dictation Client")

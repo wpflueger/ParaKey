@@ -162,6 +162,34 @@ class DictationOrchestrator:
                 except Exception as e:
                     logger.error(f"Error in state change callback: {e}")
 
+    async def _wait_for_backend_ready(self) -> None:
+        """Wait for backend readiness before enabling hotkeys."""
+        if self._grpc_client is None:
+            raise RuntimeError("gRPC client not initialized")
+
+        deadline = time.monotonic() + self._config.backend_ready_timeout_s
+        last_error: Optional[str] = None
+
+        while time.monotonic() < deadline:
+            try:
+                health = await self._grpc_client.health()
+                if health.ready:
+                    logger.info(
+                        "Backend ready: mode=%s detail=%s",
+                        health.mode,
+                        health.detail,
+                    )
+                    return
+                last_error = health.detail
+            except Exception as e:
+                last_error = str(e)
+
+            await asyncio.sleep(self._config.backend_ready_poll_s)
+
+        raise RuntimeError(
+            f"Backend not ready: {last_error or 'timeout'}"
+        )
+
     async def start(self) -> None:
         """Start the orchestrator.
 
@@ -179,14 +207,8 @@ class DictationOrchestrator:
             self._config.backend_port,
         )
 
-        # Check backend health
-        try:
-            health = await self._grpc_client.health()
-            logger.info(
-                f"Backend connected: mode={health.mode}, ready={health.ready}"
-            )
-        except Exception as e:
-            logger.warning(f"Backend health check failed: {e}")
+        # Wait for backend health
+        await self._wait_for_backend_ready()
 
         # Initialize audio capture
         self._audio_capture = create_capture(
