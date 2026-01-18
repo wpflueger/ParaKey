@@ -63,15 +63,7 @@ async def run_interactive(config: ClientConfig | None = None) -> None:
     """
     config = config or ClientConfig()
 
-    # Determine if we should use mocks based on platform
-    use_mock_audio = sys.platform != "win32"
-    use_mock_hotkey = sys.platform != "win32"
-
-    orchestrator = DictationOrchestrator(
-        config,
-        use_mock_audio=use_mock_audio,
-        use_mock_hotkey=use_mock_hotkey,
-    )
+    orchestrator = DictationOrchestrator(config)
 
     # Setup callbacks for console output
     def on_state(state: DictationState) -> None:
@@ -127,12 +119,8 @@ async def run_interactive(config: ClientConfig | None = None) -> None:
     print("\n" + "=" * 50)
     print("KeyMuse Dictation Client")
     print("=" * 50)
-    if sys.platform == "win32":
-        print("Press Ctrl+Alt to start recording")
-        print("Release to stop and insert text")
-    else:
-        print("Running in mock mode (non-Windows)")
-        print("Real hotkey detection requires Windows")
+    print("Press Ctrl+Alt to start recording")
+    print("Release to stop and insert text")
     print("Press Ctrl+C to exit")
     print("=" * 50 + "\n")
 

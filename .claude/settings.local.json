@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir /b /s)",
+      "Bash(powershell -ExecutionPolicy Bypass -File scripts/build_windows.ps1)",
+      "Bash(C:/Users/willp/Projects/KeyMuse/dist/KeyMuse/KeyMuse.exe --help)",
+      "Bash(C:/Users/willp/Projects/KeyMuse/dist/KeyMuse/KeyMuse.exe --mode health)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash($env:PYTHONPATH=\"shared/src;backend/src;client/src\")",
+      "Bash(PYTHONPATH=\"shared/src:backend/src:client/src\" timeout 15 .venv/Scripts/python.exe:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -Command \"cd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse; Remove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue; python -m venv .venv; .\\\\.venv\\\\Scripts\\\\python.exe --version\")",
+      "Bash(/c/Users/willp/Projects/KeyMuse/.venv/Scripts/python.exe:*)",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -File:*)",
+      "Bash(powershell -NoProfile -Command \"python --version; \\(Get-Command python\\).Source\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -Command \"\ncd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse\nRemove-Item -Recurse -Force .venv -ErrorAction SilentlyContinue\npython -m venv .venv\n.\\\\.venv\\\\Scripts\\\\python.exe --version\n\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -Command \"\ncd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install --upgrade pip\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r client\\\\requirements.txt\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r shared\\\\requirements.txt\nWrite-Host ''Client dependencies installed'' -ForegroundColor Green\n\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -Command \"\ncd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r backend\\\\requirements.txt\nWrite-Host ''Backend dependencies installed'' -ForegroundColor Green\n\")",
+      "Bash(powershell -NoProfile -ExecutionPolicy Bypass -Command \"\ncd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r backend\\\\requirements.txt 2>&1\n\")",
+      "Bash(powershell:*)",
+      "Bash(/c/Users/willp/Projects/KeyMuse/dist/KeyMuse/KeyMuse.exe:*)",
+      "Bash(PYTHONPATH=\"shared/src:backend/src:client/src\" timeout 30 .venv/Scripts/python.exe:*)"
+    ]
+  }
+}

@@ -18,8 +18,45 @@ logger = logging.getLogger(__name__)
 # Default model name
 DEFAULT_MODEL = "nvidia/parakeet-tdt-0.6b-v3"
 
-# Cache directory for models
-CACHE_DIR = Path.home() / ".cache" / "keymuse" / "models"
+# Cache directory for models (NeMo uses HuggingFace Hub cache)
+CACHE_DIR = Path.home() / ".cache" / "huggingface" / "hub"
+
+
+def get_model_cache_info() -> dict:
+    """Get information about model cache location and status.
+
+    Returns:
+        Dict with cache_dir, model_cached, and cache_size_mb.
+    """
+    cache_dir = CACHE_DIR
+    hf_home = os.environ.get("HF_HOME")
+    if hf_home:
+        cache_dir = Path(hf_home) / "hub"
+
+    # Also check XDG_CACHE_HOME
+    xdg_cache = os.environ.get("XDG_CACHE_HOME")
+    if xdg_cache and not hf_home:
+        cache_dir = Path(xdg_cache) / "huggingface" / "hub"
+
+    model_cached = False
+    cache_size_mb = 0.0
+
+    # Check if model directory exists (approximate check)
+    if cache_dir.exists():
+        for item in cache_dir.iterdir():
+            if "parakeet" in item.name.lower():
+                model_cached = True
+                # Calculate size
+                if item.is_dir():
+                    for f in item.rglob("*"):
+                        if f.is_file():
+                            cache_size_mb += f.stat().st_size / (1024 * 1024)
+
+    return {
+        "cache_dir": str(cache_dir),
+        "model_cached": model_cached,
+        "cache_size_mb": round(cache_size_mb, 1),
+    }
 
 
 class ModelLoadError(Exception):
@@ -120,10 +157,23 @@ class ModelLoader:
             # Import NeMo here to avoid import errors if not installed
             import nemo.collections.asr as nemo_asr
 
+            # Show cache info
+            cache_info = get_model_cache_info()
+            logger.info(f"Model cache directory: {cache_info['cache_dir']}")
+
+            if cache_info["model_cached"]:
+                logger.info(
+                    f"Model already cached ({cache_info['cache_size_mb']:.1f} MB)"
+                )
+            else:
+                logger.info("Model not cached - will download (~1.2 GB)")
+                logger.info("Download progress will be shown below...")
+
             logger.info(f"Loading model: {self._model_name}")
             logger.info(f"Device: {self._device}")
 
             # Load the model from HuggingFace
+            # HuggingFace Hub will show download progress automatically
             self._model = nemo_asr.models.ASRModel.from_pretrained(
                 self._model_name,
                 map_location=self._device,
@@ -189,7 +239,10 @@ class ModelLoader:
             transcripts = self._model.transcribe([audio_float])
 
         if transcripts and len(transcripts) > 0:
-            return transcripts[0]
+            first = transcripts[0]
+            if hasattr(first, "text"):
+                return str(first.text)
+            return str(first)
         return ""
 
     def transcribe_file(self, audio_path: str) -> str:
@@ -211,7 +264,10 @@ class ModelLoader:
             transcripts = self._model.transcribe([audio_path])
 
         if transcripts and len(transcripts) > 0:
-            return transcripts[0]
+            first = transcripts[0]
+            if hasattr(first, "text"):
+                return str(first.text)
+            return str(first)
         return ""
 
     def get_model(self):
@@ -274,6 +330,7 @@ __all__ = [
     "ModelLoadError",
     "get_device",
     "get_gpu_memory_mb",
+    "get_model_cache_info",
     "get_model_loader",
     "load_model",
     "DEFAULT_MODEL",
