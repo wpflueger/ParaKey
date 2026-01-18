@@ -37,7 +37,7 @@ KEYEVENTF_UNICODE = 0x0004
 if sys.platform == "win32":
     # Define INPUT structure for SendInput
 
-    ULONG_PTR = wintypes.ULONG_PTR
+    ULONG_PTR = getattr(wintypes, "ULONG_PTR", ctypes.c_size_t)
 
     class KEYBDINPUT(ctypes.Structure):
         _fields_ = [
