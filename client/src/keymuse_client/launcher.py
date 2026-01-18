@@ -399,7 +399,7 @@ async def run_app() -> None:
 def main() -> None:
     """Main entry point."""
     # Handle Ctrl+C gracefully
-    def signal_handler(signum, frame):
+    def signal_handler(*_args):
         print("\nInterrupted, cleaning up...")
         _cleanup_backend()
         sys.exit(0)
