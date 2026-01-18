@@ -414,6 +414,8 @@ def main() -> None:
     try:
         asyncio.run(run_app())
     except KeyboardInterrupt:
+        # KeyboardInterrupt is already handled inside run_app(); suppress it here
+        # to avoid an extra traceback and allow a clean, quiet shutdown.
         pass
 
 
