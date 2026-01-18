@@ -385,7 +385,7 @@ class KeyMuseApp:
         args = self._args
 
         # Find Python
-        self._schedule_ui(
+        self._schedule_startup_window(
             lambda: self._startup_window.set_status("Finding Python environment...")
         )
 
@@ -402,7 +402,9 @@ class KeyMuseApp:
             else:
                 version_msg += " (CPU)"
 
-            self._schedule_ui(lambda: self._startup_window.append_log(version_msg))
+            self._schedule_startup_window(
+                lambda: self._startup_window.append_log(version_msg)
+            )
 
         except PythonNotFoundError as e:
             raise RuntimeError(f"Python not found: {e}")
@@ -410,16 +412,14 @@ class KeyMuseApp:
             raise RuntimeError(f"Missing dependencies: {e}")
 
         # Start backend
-        self._schedule_ui(
+        self._schedule_startup_window(
             lambda: self._startup_window.set_status("Starting backend server...")
         )
 
         def on_backend_output(line: str):
-            # Only append to startup window if it still exists
-            def append_if_exists():
-                if self._startup_window is not None:
-                    self._startup_window.append_log(line)
-            self._schedule_ui(append_if_exists)
+            self._schedule_startup_window(
+                lambda: self._startup_window.append_log(line)
+            )
 
         self._backend_process = start_backend_subprocess(
             self._python_info,
@@ -432,7 +432,7 @@ class KeyMuseApp:
         )
 
         # Wait for backend health
-        self._schedule_ui(
+        self._schedule_startup_window(
             lambda: self._startup_window.set_status("Loading speech recognition model...")
         )
 
@@ -449,6 +449,13 @@ class KeyMuseApp:
         """Schedule a callback on the UI thread."""
         if self._async_bridge:
             self._async_bridge.schedule_ui_update(callback)
+
+    def _schedule_startup_window(self, callback: callable) -> None:
+        """Schedule a callback that requires the startup window."""
+        def safe_callback():
+            if self._startup_window is not None:
+                callback()
+        self._schedule_ui(safe_callback)
 
     def _on_startup_complete(self, result: bool) -> None:
         """Called when startup completes successfully."""
