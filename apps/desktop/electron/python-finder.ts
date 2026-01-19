@@ -87,6 +87,25 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
   return info;
 };
 
+export const getPythonInfoForExecutable = (
+  pythonPath: string,
+  checkDeps: boolean,
+): PythonInfo | null => getPythonInfo(pythonPath, checkDeps);
+
+export const resolveVenvPython = (venvRoot: string): string => {
+  return process.platform === "win32"
+    ? path.join(venvRoot, "Scripts", "python.exe")
+    : path.join(venvRoot, "bin", "python");
+};
+
+export const ensureVenv = (pythonPath: string, venvRoot: string): string => {
+  const venvPython = resolveVenvPython(venvRoot);
+  if (!fs.existsSync(venvPython)) {
+    execFileSync(pythonPath, ["-m", "venv", venvRoot], { stdio: "inherit" });
+  }
+  return venvPython;
+};
+
 const findEnvPython = (): string | null => {
   const envPython = process.env.KEYMUSE_PYTHON;
   if (envPython && fs.existsSync(envPython)) {
@@ -222,8 +241,8 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   );
 };
 
-export const installBackendDeps = (pythonPath: string, repoRoot: string): void => {
-  const requirements = path.join(repoRoot, "backend", "requirements.txt");
+export const installBackendDeps = (pythonPath: string, backendRoot: string): void => {
+  const requirements = path.join(backendRoot, "requirements.txt");
   execFileSync(pythonPath, ["-m", "pip", "install", "-r", requirements], {
     stdio: "inherit",
   });

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Tray, screen } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, screen } from "electron";
 import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
 import { createAudioStream } from "./audio";
@@ -8,10 +8,19 @@ import { addTranscript, getHistory, getLastTranscript } from "./history";
 import { sanitizeText, setClipboardText, sendPaste } from "./clipboard";
 import { loadSettings, saveSettings } from "./settings";
 import type { AppSettings } from "./settings";
-import { findPython, installBackendDeps, BackendDepsError, PythonNotFoundError } from "./python-finder";
+import {
+  findPython,
+  installBackendDeps,
+  BackendDepsError,
+  PythonNotFoundError,
+  ensureVenv,
+  getPythonInfoForExecutable,
+  resolveVenvPython,
+} from "./python-finder";
 import { startBackend } from "./backend";
 import {
   APP_ROOT,
+  BACKEND_ROOT,
   ELECTRON_DIR,
   IS_DEV,
   PYTHON_CACHE_PATH,
@@ -30,7 +39,7 @@ let dictationStream: ReturnType<typeof streamAudio> | null = null;
 let dictationActive = false;
 
 const createMainWindow = () => {
-  const iconPath = path.join(APP_ROOT, "public", "logo.svg");
+  const iconPath = path.join(APP_ROOT, "public", "logo.png");
   mainWindow = new BrowserWindow({
     width: 420,
     height: 620,
@@ -117,8 +126,14 @@ const hideOverlay = () => {
 };
 
 const createTray = () => {
-  const iconPath = path.join(APP_ROOT, "public", "logo.svg");
-  tray = new Tray(iconPath);
+  const iconPath = path.join(APP_ROOT, "public", "logo.png");
+  const trayImage = nativeImage.createFromPath(iconPath);
+  if (trayImage.isEmpty()) {
+    console.warn("Tray icon could not be loaded. Please provide a PNG or ICO for Windows.");
+    mainWindow?.show();
+    return;
+  }
+  tray = new Tray(trayImage);
   const contextMenu = Menu.buildFromTemplate([
     {
       label: "Show Window",
@@ -152,8 +167,26 @@ const ensureBackend = async () => {
   };
 
   try {
-    const python = findPython(APP_ROOT, true);
-    return python;
+    const venvRoot = path.join(app.getPath("userData"), "python", ".venv");
+    const venvPython = resolveVenvPython(venvRoot);
+    const venvInfo = getPythonInfoForExecutable(venvPython, true);
+    if (venvInfo) {
+      return venvInfo;
+    }
+
+    const basePython = findPython(APP_ROOT, false);
+    const venvExecutable = ensureVenv(basePython.executable, venvRoot);
+    updateStatus({ status: "Preparing Python environment..." });
+    installBackendDeps(venvExecutable, BACKEND_ROOT);
+    const ready = getPythonInfoForExecutable(venvExecutable, true);
+    if (ready) {
+      return ready;
+    }
+
+    throw new BackendDepsError(
+      "Python environment created but backend dependencies failed to install.",
+      venvExecutable,
+    );
   } catch (error) {
     if (error instanceof BackendDepsError) {
       dialog.showMessageBox({
@@ -163,7 +196,11 @@ const ensureBackend = async () => {
           "Python dependencies are missing. KeyMuse will install the required packages now.",
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
-      installBackendDeps(error.pythonPath, path.resolve(APP_ROOT, "..", ".."));
+      installBackendDeps(error.pythonPath, BACKEND_ROOT);
+      const venvInfo = getPythonInfoForExecutable(error.pythonPath, true);
+      if (venvInfo) {
+        return venvInfo;
+      }
       return findPython(APP_ROOT, true);
     }
     if (error instanceof PythonNotFoundError) {

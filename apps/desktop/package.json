@@ -58,6 +58,28 @@
     "directories": {
       "output": "dist"
     },
+    "extraResources": [
+      {
+        "from": "../../backend/src",
+        "to": "backend/src"
+      },
+      {
+        "from": "../../backend/requirements.txt",
+        "to": "backend/requirements.txt"
+      },
+      {
+        "from": "../../shared/src",
+        "to": "shared/src"
+      },
+      {
+        "from": "../../shared/proto",
+        "to": "shared/proto"
+      },
+      {
+        "from": "../../client/src",
+        "to": "client/src"
+      }
+    ],
     "files": [
       "dist-electron/**/*",
       "dist/**/*"

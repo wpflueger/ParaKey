@@ -22,7 +22,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 ));
 
 // electron/main.ts
-var import_electron3 = require("electron");
+var import_electron4 = require("electron");
 var import_node_path5 = __toESM(require("path"), 1);
 
 // electron/grpc-client.ts
@@ -183,16 +183,20 @@ var import_node_child_process = require("child_process");
 var import_node_module = require("module");
 
 // electron/constants.ts
+var import_electron = require("electron");
 var import_node_path = __toESM(require("path"), 1);
 var IS_DEV = process.env.NODE_ENV === "development";
 var APP_ROOT = import_node_path.default.resolve(__dirname, "..");
-var REPO_ROOT = import_node_path.default.resolve(APP_ROOT, "..", "..");
+var RESOURCES_ROOT = import_electron.app.isPackaged ? process.resourcesPath : import_node_path.default.resolve(APP_ROOT, "..", "..");
+var BACKEND_ROOT = import_node_path.default.join(RESOURCES_ROOT, "backend");
+var SHARED_ROOT = import_node_path.default.join(RESOURCES_ROOT, "shared");
+var CLIENT_ROOT = import_node_path.default.join(RESOURCES_ROOT, "client");
 var ELECTRON_DIR = import_node_path.default.join(APP_ROOT, "electron");
 var PYTHON_CACHE_PATH = "C:\\Users\\willp\\.cache\\huggingface\\transformers";
 var ELECTRON_DIST = import_node_path.default.join(APP_ROOT, "dist-electron");
 var RENDERER_DIST = import_node_path.default.join(APP_ROOT, "dist");
 var RENDERER_DEV_URL = "http://localhost:5173";
-var PROTO_PATH = import_node_path.default.join(REPO_ROOT, "shared", "proto", "dictation.proto");
+var PROTO_PATH = import_node_path.default.join(SHARED_ROOT, "proto", "dictation.proto");
 
 // electron/native-deps.ts
 var resolveRebuildBinary = () => {
@@ -304,7 +308,7 @@ var getLastTranscript = () => {
 };
 
 // electron/clipboard.ts
-var import_electron = require("electron");
+var import_electron2 = require("electron");
 var import_uiohook_napi2 = require("uiohook-napi");
 var CONTROL_PATTERN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g;
 var BIDI_PATTERN = new RegExp("[\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]", "g");
@@ -317,25 +321,25 @@ var sanitizeText = (text) => {
   return sanitized;
 };
 var setClipboardText = (text) => {
-  previousClipboardText = import_electron.clipboard.readText();
-  import_electron.clipboard.writeText(text);
+  previousClipboardText = import_electron2.clipboard.readText();
+  import_electron2.clipboard.writeText(text);
 };
 var sendPaste = () => {
   setTimeout(() => {
     import_uiohook_napi2.uIOhook.keyTap(import_uiohook_napi2.UiohookKey.V, [import_uiohook_napi2.UiohookKey.Ctrl]);
     setTimeout(() => {
       if (previousClipboardText !== null) {
-        import_electron.clipboard.writeText(previousClipboardText);
+        import_electron2.clipboard.writeText(previousClipboardText);
         previousClipboardText = null;
       } else {
-        import_electron.clipboard.clear();
+        import_electron2.clipboard.clear();
       }
     }, 100);
   }, 50);
 };
 
 // electron/settings.ts
-var import_electron2 = require("electron");
+var import_electron3 = require("electron");
 var import_node_fs = __toESM(require("fs"), 1);
 var import_node_path2 = __toESM(require("path"), 1);
 var DEFAULT_SETTINGS = {
@@ -367,7 +371,7 @@ var DEFAULT_SETTINGS = {
   showNotifications: true
 };
 var SETTINGS_FILE = "settings.json";
-var getSettingsPath = () => import_node_path2.default.join(import_electron2.app.getPath("userData"), SETTINGS_FILE);
+var getSettingsPath = () => import_node_path2.default.join(import_electron3.app.getPath("userData"), SETTINGS_FILE);
 var loadSettings = () => {
   const filePath = getSettingsPath();
   try {
@@ -461,6 +465,17 @@ var getPythonInfo = (pythonPath, checkDeps) => {
     }
   }
   return info;
+};
+var getPythonInfoForExecutable = (pythonPath, checkDeps) => getPythonInfo(pythonPath, checkDeps);
+var resolveVenvPython = (venvRoot) => {
+  return process.platform === "win32" ? import_node_path3.default.join(venvRoot, "Scripts", "python.exe") : import_node_path3.default.join(venvRoot, "bin", "python");
+};
+var ensureVenv = (pythonPath, venvRoot) => {
+  const venvPython = resolveVenvPython(venvRoot);
+  if (!import_node_fs2.default.existsSync(venvPython)) {
+    (0, import_node_child_process2.execFileSync)(pythonPath, ["-m", "venv", venvRoot], { stdio: "inherit" });
+  }
+  return venvPython;
 };
 var findEnvPython = () => {
   const envPython = process.env.KEYMUSE_PYTHON;
@@ -586,8 +601,8 @@ var findPython = (appRoot, checkDeps = true) => {
     "Python 3.11+ not found. Install Python or set KEYMUSE_PYTHON to your Python executable."
   );
 };
-var installBackendDeps = (pythonPath, repoRoot) => {
-  const requirements = import_node_path3.default.join(repoRoot, "backend", "requirements.txt");
+var installBackendDeps = (pythonPath, backendRoot) => {
+  const requirements = import_node_path3.default.join(backendRoot, "requirements.txt");
   (0, import_node_child_process2.execFileSync)(pythonPath, ["-m", "pip", "install", "-r", requirements], {
     stdio: "inherit"
   });
@@ -596,11 +611,11 @@ var installBackendDeps = (pythonPath, repoRoot) => {
 // electron/backend.ts
 var import_node_child_process3 = require("child_process");
 var import_node_path4 = __toESM(require("path"), 1);
-var buildPythonPath = (repoRoot) => {
+var buildPythonPath = () => {
   const paths = [
-    import_node_path4.default.join(repoRoot, "shared", "src"),
-    import_node_path4.default.join(repoRoot, "backend", "src"),
-    import_node_path4.default.join(repoRoot, "client", "src")
+    import_node_path4.default.join(SHARED_ROOT, "src"),
+    import_node_path4.default.join(BACKEND_ROOT, "src"),
+    import_node_path4.default.join(CLIENT_ROOT, "src")
   ];
   const existing = process.env.PYTHONPATH;
   if (existing) {
@@ -612,7 +627,7 @@ var startBackend = (python, options) => {
   var _a, _b;
   const env = {
     ...process.env,
-    PYTHONPATH: buildPythonPath(REPO_ROOT),
+    PYTHONPATH: buildPythonPath(),
     KEYMUSE_HOST: options.host,
     KEYMUSE_PORT: String(options.port),
     PYTHONUNBUFFERED: "1"
@@ -664,8 +679,8 @@ var audioController = null;
 var dictationStream = null;
 var dictationActive = false;
 var createMainWindow = () => {
-  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.svg");
-  mainWindow = new import_electron3.BrowserWindow({
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.png");
+  mainWindow = new import_electron4.BrowserWindow({
     width: 420,
     height: 620,
     minWidth: 380,
@@ -693,7 +708,7 @@ var createMainWindow = () => {
   });
 };
 var createOverlayWindow = () => {
-  overlayWindow = new import_electron3.BrowserWindow({
+  overlayWindow = new import_electron4.BrowserWindow({
     width: 260,
     height: 50,
     transparent: true,
@@ -717,7 +732,7 @@ var positionOverlay = (mode) => {
   }
   const { xOffset, yOffset } = settings.overlay;
   const { width, height } = overlayWindow.getBounds();
-  const { width: screenW, height: screenH } = import_electron3.screen.getPrimaryDisplay().workAreaSize;
+  const { width: screenW, height: screenH } = import_electron4.screen.getPrimaryDisplay().workAreaSize;
   let x = xOffset;
   let y = yOffset;
   if (mode.includes("right")) {
@@ -743,9 +758,15 @@ var hideOverlay = () => {
   overlayWindow == null ? void 0 : overlayWindow.hide();
 };
 var createTray = () => {
-  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.svg");
-  tray = new import_electron3.Tray(iconPath);
-  const contextMenu = import_electron3.Menu.buildFromTemplate([
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.png");
+  const trayImage = import_electron4.nativeImage.createFromPath(iconPath);
+  if (trayImage.isEmpty()) {
+    console.warn("Tray icon could not be loaded. Please provide a PNG or ICO for Windows.");
+    mainWindow == null ? void 0 : mainWindow.show();
+    return;
+  }
+  tray = new import_electron4.Tray(trayImage);
+  const contextMenu = import_electron4.Menu.buildFromTemplate([
     {
       label: "Show Window",
       click: () => mainWindow == null ? void 0 : mainWindow.show()
@@ -762,7 +783,7 @@ var createTray = () => {
     { type: "separator" },
     {
       label: "Quit",
-      click: () => import_electron3.app.quit()
+      click: () => import_electron4.app.quit()
     }
   ]);
   tray.setToolTip("KeyMuse - Press Ctrl+Alt to dictate");
@@ -776,21 +797,41 @@ var ensureBackend = async () => {
     mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", payload.status);
   };
   try {
-    const python = findPython(APP_ROOT, true);
-    return python;
+    const venvRoot = import_node_path5.default.join(import_electron4.app.getPath("userData"), "python", ".venv");
+    const venvPython = resolveVenvPython(venvRoot);
+    const venvInfo = getPythonInfoForExecutable(venvPython, true);
+    if (venvInfo) {
+      return venvInfo;
+    }
+    const basePython = findPython(APP_ROOT, false);
+    const venvExecutable = ensureVenv(basePython.executable, venvRoot);
+    updateStatus({ status: "Preparing Python environment..." });
+    installBackendDeps(venvExecutable, BACKEND_ROOT);
+    const ready = getPythonInfoForExecutable(venvExecutable, true);
+    if (ready) {
+      return ready;
+    }
+    throw new BackendDepsError(
+      "Python environment created but backend dependencies failed to install.",
+      venvExecutable
+    );
   } catch (error) {
     if (error instanceof BackendDepsError) {
-      import_electron3.dialog.showMessageBox({
+      import_electron4.dialog.showMessageBox({
         type: "info",
         title: "Installing Dependencies",
         message: "Python dependencies are missing. KeyMuse will install the required packages now."
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
-      installBackendDeps(error.pythonPath, import_node_path5.default.resolve(APP_ROOT, "..", ".."));
+      installBackendDeps(error.pythonPath, BACKEND_ROOT);
+      const venvInfo = getPythonInfoForExecutable(error.pythonPath, true);
+      if (venvInfo) {
+        return venvInfo;
+      }
       return findPython(APP_ROOT, true);
     }
     if (error instanceof PythonNotFoundError) {
-      import_electron3.dialog.showErrorBox(
+      import_electron4.dialog.showErrorBox(
         "Python Required",
         "Python 3.11+ is required to run the speech model. Install Python and restart KeyMuse."
       );
@@ -950,18 +991,18 @@ var stopDictation = async () => {
   mainWindow == null ? void 0 : mainWindow.webContents.send("dictation:state", { state: "IDLE" });
 };
 var wireIpc = () => {
-  import_electron3.ipcMain.handle("settings:get", () => settings);
-  import_electron3.ipcMain.handle("settings:save", (_event, next) => {
+  import_electron4.ipcMain.handle("settings:get", () => settings);
+  import_electron4.ipcMain.handle("settings:save", (_event, next) => {
     settings = next;
     saveSettings(settings);
     return true;
   });
-  import_electron3.ipcMain.handle("history:get", () => getHistory());
-  import_electron3.ipcMain.handle("cache:get", () => PYTHON_CACHE_PATH);
-  import_electron3.ipcMain.handle("dictation:start", () => startDictation());
-  import_electron3.ipcMain.handle("dictation:stop", () => stopDictation());
-  import_electron3.ipcMain.handle("window:show", () => mainWindow == null ? void 0 : mainWindow.show());
-  import_electron3.ipcMain.handle("window:minimize", () => mainWindow == null ? void 0 : mainWindow.hide());
+  import_electron4.ipcMain.handle("history:get", () => getHistory());
+  import_electron4.ipcMain.handle("cache:get", () => PYTHON_CACHE_PATH);
+  import_electron4.ipcMain.handle("dictation:start", () => startDictation());
+  import_electron4.ipcMain.handle("dictation:stop", () => stopDictation());
+  import_electron4.ipcMain.handle("window:show", () => mainWindow == null ? void 0 : mainWindow.show());
+  import_electron4.ipcMain.handle("window:minimize", () => mainWindow == null ? void 0 : mainWindow.hide());
 };
 var waitForRenderer = () => new Promise((resolve) => {
   if (!mainWindow) {
@@ -993,10 +1034,10 @@ process.on("unhandledRejection", (reason) => {
   const message = reason instanceof Error ? reason.message : "Unhandled rejection";
   mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", `Unhandled: ${message}`);
 });
-import_electron3.app.whenReady().then(startApp);
-import_electron3.app.on("window-all-closed", () => {
+import_electron4.app.whenReady().then(startApp);
+import_electron4.app.on("window-all-closed", () => {
 });
-import_electron3.app.on("before-quit", () => {
+import_electron4.app.on("before-quit", () => {
   stopHotkeyListener();
   backendProcess == null ? void 0 : backendProcess.kill();
   tray == null ? void 0 : tray.destroy();

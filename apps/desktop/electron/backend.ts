@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { BackendDepsError } from "./python-finder";
 import type { PythonInfo } from "./python-finder";
-import { REPO_ROOT } from "./constants";
+import { BACKEND_ROOT, CLIENT_ROOT, SHARED_ROOT } from "./constants";
 
 export type BackendStartOptions = {
   host: string;
@@ -18,11 +18,11 @@ export type BackendProcess = {
   kill: () => void;
 };
 
-const buildPythonPath = (repoRoot: string): string => {
+const buildPythonPath = (): string => {
   const paths = [
-    path.join(repoRoot, "shared", "src"),
-    path.join(repoRoot, "backend", "src"),
-    path.join(repoRoot, "client", "src"),
+    path.join(SHARED_ROOT, "src"),
+    path.join(BACKEND_ROOT, "src"),
+    path.join(CLIENT_ROOT, "src"),
   ];
   const existing = process.env.PYTHONPATH;
   if (existing) {
@@ -37,7 +37,7 @@ export const startBackend = (
 ): BackendProcess => {
   const env: Record<string, string> = {
     ...process.env,
-    PYTHONPATH: buildPythonPath(REPO_ROOT),
+    PYTHONPATH: buildPythonPath(),
     KEYMUSE_HOST: options.host,
     KEYMUSE_PORT: String(options.port),
     PYTHONUNBUFFERED: "1",
