@@ -12,19 +12,16 @@ class BackendConfig:
     host: str = "127.0.0.1"
     port: int = 50051
 
-    # Engine mode: 'nemo' for real inference, 'mock' for testing
+    # Engine mode: 'nemo' for real inference
     mode: str = "nemo"
 
-    # Model settings (used when mode != 'mock')
+    # Model settings
     model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
     device: Optional[str] = None  # None = auto-detect (GPU if available)
 
     # Streaming settings
     partial_every_n_frames: int = 10
     sample_rate_hz: int = 16000
-
-    # Mock settings
-    final_text: str = "Mock transcript from KeyMuse"
 
 
 def load_config_from_env() -> BackendConfig:

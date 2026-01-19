@@ -1,8 +1,4 @@
-"""Inference engine for speech-to-text transcription.
-
-This module provides both mock and real inference engines for the KeyMuse
-backend service.
-"""
+"""Inference engine for speech-to-text transcription."""
 
 from __future__ import annotations
 
@@ -10,7 +6,7 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Iterable, Optional
+from typing import Optional
 
 from keymuse_backend.config import BackendConfig
 
@@ -206,63 +202,7 @@ class InferenceEngine:
         return events
 
 
-class MockInferenceEngine:
-    """Mock inference engine for testing without the real model."""
-
-    def __init__(self, config: BackendConfig) -> None:
-        self._config = config
-        self._loaded = False
-
-    @property
-    def is_loaded(self) -> bool:
-        return self._loaded
-
-    @property
-    def device(self) -> str:
-        return "mock"
-
-    def load_model(self) -> None:
-        self._loaded = True
-        logger.info("Mock inference engine loaded")
-
-    def unload_model(self) -> None:
-        self._loaded = False
-        logger.info("Mock inference engine unloaded")
-
-    async def transcribe(
-        self,
-        audio_data: bytes,
-        sample_rate: int = 16000,
-    ) -> str:
-        # Simulate processing time
-        await asyncio.sleep(0.1)
-        return self._config.final_text
-
-    async def process_audio_stream(
-        self,
-        audio_frames: list[bytes],
-        sample_rate: int = 16000,
-    ) -> list[EngineEvent]:
-        events: list[EngineEvent] = []
-
-        # Generate partial events
-        for i, _ in enumerate(audio_frames, start=1):
-            if i % self._config.partial_every_n_frames == 0:
-                events.append(
-                    EngineEvent(
-                        kind="partial",
-                        text="Listening...",
-                        stability=0.4,
-                    )
-                )
-
-        # Final event with mock text
-        events.append(EngineEvent(kind="final", text=self._config.final_text))
-
-        return events
-
-
-def create_engine(config: BackendConfig) -> InferenceEngine | MockInferenceEngine:
+def create_engine(config: BackendConfig) -> InferenceEngine:
     """Create an inference engine based on configuration.
 
     Args:
@@ -271,38 +211,11 @@ def create_engine(config: BackendConfig) -> InferenceEngine | MockInferenceEngin
     Returns:
         An inference engine instance.
     """
-    if config.mode == "mock":
-        return MockInferenceEngine(config)
     return InferenceEngine(config)
-
-
-# Legacy function for backwards compatibility
-def generate_mock_events(
-    config: BackendConfig, audio_frames: Iterable[bytes]
-) -> list[EngineEvent]:
-    """Generate mock events (backwards compatibility).
-
-    Args:
-        config: Backend configuration.
-        audio_frames: Iterable of audio frame bytes.
-
-    Returns:
-        List of mock engine events.
-    """
-    events: list[EngineEvent] = []
-    for index, _frame in enumerate(audio_frames, start=1):
-        if index % config.partial_every_n_frames == 0:
-            events.append(
-                EngineEvent(kind="partial", text="Listening...", stability=0.4)
-            )
-    events.append(EngineEvent(kind="final", text=config.final_text))
-    return events
 
 
 __all__ = [
     "EngineEvent",
     "InferenceEngine",
-    "MockInferenceEngine",
     "create_engine",
-    "generate_mock_events",
 ]

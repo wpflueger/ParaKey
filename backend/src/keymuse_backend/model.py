@@ -229,14 +229,27 @@ class ModelLoader:
         import numpy as np
 
         # Convert bytes to numpy array (16-bit signed PCM)
-        audio_array = np.frombuffer(audio_data, dtype=np.int16)
+        audio_array = np.frombuffer(audio_data, dtype="int16")
 
         # Normalize to float32 [-1, 1]
-        audio_float = audio_array.astype(np.float32) / 32768.0
+        audio_float = audio_array.astype("float32") / 32768.0
+        if audio_float.ndim > 1:
+            audio_float = audio_float.flatten()
 
-        # Transcribe
+        # Convert to torch tensor to avoid numpy 2.x dtype inference issues in NeMo
+        audio_tensor = torch.from_numpy(audio_float).float()
+
+        # Transcribe - try tensor first, fall back to list for compatibility
         with torch.no_grad():
-            transcripts = self._model.transcribe([audio_float])
+            try:
+                transcripts = self._model.transcribe(audio=[audio_tensor])
+            except (TypeError, RuntimeError):
+                # Fall back to list if tensor not supported
+                try:
+                    transcripts = self._model.transcribe(audio=[audio_float.tolist()])
+                except TypeError:
+                    # Older NeMo versions expect positional argument
+                    transcripts = self._model.transcribe([audio_float.tolist()])
 
         if transcripts and len(transcripts) > 0:
             first = transcripts[0]

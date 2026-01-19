@@ -12,7 +12,6 @@ import grpc
 from keymuse_backend.config import BackendConfig
 from keymuse_backend.engine import (
     InferenceEngine,
-    MockInferenceEngine,
     create_engine,
 )
 from keymuse_proto import dictation_pb2, dictation_pb2_grpc
@@ -26,7 +25,7 @@ class DictationService(dictation_pb2_grpc.DictationServiceServicer):
     def __init__(
         self,
         config: BackendConfig,
-        engine: Optional[InferenceEngine | MockInferenceEngine] = None,
+        engine: Optional[InferenceEngine] = None,
     ) -> None:
         """Initialize the dictation service.
 
@@ -38,7 +37,7 @@ class DictationService(dictation_pb2_grpc.DictationServiceServicer):
         self._engine = engine or create_engine(config)
 
     @property
-    def engine(self) -> InferenceEngine | MockInferenceEngine:
+    def engine(self) -> InferenceEngine:
         """Get the inference engine."""
         return self._engine
 

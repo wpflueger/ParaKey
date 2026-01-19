@@ -1,9 +1,12 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller spec file for KeyMuse client.
 
-This builds a lightweight client-only application (~70MB) that spawns
+This builds a lightweight client-only application (~75MB) that spawns
 the backend as a separate Python subprocess. The backend runs from the
 user's Python installation with torch/CUDA support.
+
+The client includes a tkinter-based GUI for status display and
+transcription history.
 """
 
 import os
@@ -30,6 +33,7 @@ a = Analysis(
         "keymuse_client.orchestrator",
         "keymuse_client.grpc_client",
         "keymuse_client.python_finder",
+        "keymuse_client.settings",
         "keymuse_client.audio",
         "keymuse_client.audio.capture",
         "keymuse_client.audio.devices",
@@ -40,6 +44,16 @@ a = Analysis(
         "keymuse_client.insertion.keyboard",
         "keymuse_client.insertion.clipboard",
         "keymuse_client.insertion.window",
+        # UI modules
+        "keymuse_client.ui",
+        "keymuse_client.ui.tray",
+        "keymuse_client.ui.overlay",
+        "keymuse_client.ui.theme",
+        "keymuse_client.ui.async_bridge",
+        "keymuse_client.ui.status_panel",
+        "keymuse_client.ui.history_panel",
+        "keymuse_client.ui.startup_window",
+        "keymuse_client.ui.main_window",
         # Proto modules (shared)
         "keymuse_proto",
         "keymuse_proto.dictation_pb2",
@@ -55,6 +69,11 @@ a = Analysis(
         "win32gui",
         "win32clipboard",
         "pywintypes",
+        # UI dependencies
+        "PIL",
+        "PIL.Image",
+        "PIL.ImageDraw",
+        "pystray",
     ],
     hookspath=[],
     hooksconfig={},
@@ -79,7 +98,6 @@ a = Analysis(
         # Exclude other unnecessary packages
         "cv2",
         "opencv",
-        "PIL",
         "matplotlib",
         "pandas",
         "numpy.testing",
@@ -94,8 +112,7 @@ a = Analysis(
         "setuptools",
         "pip",
         "wheel",
-        "tkinter",
-        "_tkinter",
+        # Note: tkinter and PIL are now INCLUDED for UI support
     ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
@@ -115,7 +132,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,

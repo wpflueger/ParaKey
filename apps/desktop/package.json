@@ -1,0 +1,94 @@
+{
+  "name": "keymuse-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "dev": "bunx concurrently -k \"vite\" \"bun run electron:watch\" \"bun run electron:dev\"",
+    "electron:watch": "tsup --watch",
+    "electron:dev": "bunx wait-on http://localhost:5173 dist-electron/preload.cjs dist-electron/main.cjs && bun run electron:start",
+    "electron:start": "electron .",
+    "build:renderer": "tsc -b && vite build",
+    "build:electron": "tsup && node -e \"require('fs').copyFileSync('electron/overlay.html', 'dist-electron/overlay.html')\"",
+    "build": "bun run build:renderer && bun run build:electron",
+    "dist": "bun run build && electron-builder --win",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:ui": "vitest --ui",
+    "rebuild:native": "electron-rebuild -f -w naudiodon"
+  },
+  "dependencies": {
+    "@grpc/grpc-js": "^1.14.0",
+    "@grpc/proto-loader": "^0.7.12",
+    "naudiodon": "^2.3.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "uiohook-napi": "^1.5.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.5",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/ui": "^2.1.9",
+    "concurrently": "^9.2.0",
+    "electron-rebuild": "^3.2.9",
+
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.5.0",
+    "jsdom": "^25.0.0",
+    "tsup": "^8.5.0",
+    "typescript": "~5.9.3",
+    "typescript-eslint": "^8.46.4",
+    "vite": "^7.2.4",
+    "vitest": "^2.1.9",
+    "wait-on": "^8.0.2"
+  },
+  "build": {
+    "appId": "com.keymuse.desktop",
+    "productName": "KeyMuse",
+    "directories": {
+      "output": "dist"
+    },
+    "extraResources": [
+      {
+        "from": "../../backend/src",
+        "to": "backend/src"
+      },
+      {
+        "from": "../../backend/requirements.txt",
+        "to": "backend/requirements.txt"
+      },
+      {
+        "from": "../../shared/src",
+        "to": "shared/src"
+      },
+      {
+        "from": "../../shared/proto",
+        "to": "shared/proto"
+      }
+    ],
+    "files": [
+      "dist-electron/**/*",
+      "dist/**/*"
+    ],
+    "win": {
+      "icon": "public/icons/app.ico",
+      "target": "nsis"
+    },
+    "nsis": {
+      "installerIcon": "public/icons/app.ico",
+      "uninstallerIcon": "public/icons/app.ico",
+      "installerHeader": "public/icons/installer-header-150x57.png",
+      "installerSidebar": "public/icons/installer-sidebar-164x314.png"
+    }
+  }
+}
