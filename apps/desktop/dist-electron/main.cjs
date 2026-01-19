@@ -664,13 +664,15 @@ var audioController = null;
 var dictationStream = null;
 var dictationActive = false;
 var createMainWindow = () => {
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "km_logo.png");
   mainWindow = new import_electron3.BrowserWindow({
     width: 420,
     height: 620,
     minWidth: 380,
     minHeight: 520,
     show: !settings.startMinimized,
-    backgroundColor: "#f3ede3",
+    backgroundColor: "#f8f4ed",
+    icon: iconPath,
     webPreferences: {
       preload: import_node_path5.default.join(APP_ROOT, "dist-electron", "preload.cjs"),
       contextIsolation: true,
@@ -741,7 +743,8 @@ var hideOverlay = () => {
   overlayWindow == null ? void 0 : overlayWindow.hide();
 };
 var createTray = () => {
-  tray = new import_electron3.Tray(import_electron3.nativeImage.createEmpty());
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "km_logo.png");
+  tray = new import_electron3.Tray(iconPath);
   const contextMenu = import_electron3.Menu.buildFromTemplate([
     {
       label: "Show Window",

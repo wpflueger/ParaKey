@@ -30,13 +30,15 @@ let dictationStream: ReturnType<typeof streamAudio> | null = null;
 let dictationActive = false;
 
 const createMainWindow = () => {
+  const iconPath = path.join(APP_ROOT, "public", "logo.svg");
   mainWindow = new BrowserWindow({
     width: 420,
     height: 620,
     minWidth: 380,
     minHeight: 520,
     show: !settings.startMinimized,
-    backgroundColor: "#f3ede3",
+    backgroundColor: "#f8f4ed",
+    icon: iconPath,
     webPreferences: {
       preload: path.join(APP_ROOT, "dist-electron", "preload.cjs"),
       contextIsolation: true,
@@ -115,7 +117,8 @@ const hideOverlay = () => {
 };
 
 const createTray = () => {
-  tray = new Tray(nativeImage.createEmpty());
+  const iconPath = path.join(APP_ROOT, "public", "logo.svg");
+  tray = new Tray(iconPath);
   const contextMenu = Menu.buildFromTemplate([
     {
       label: "Show Window",
