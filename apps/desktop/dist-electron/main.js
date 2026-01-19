@@ -19,7 +19,6 @@ var APP_ROOT = path.resolve(__dirname, "..");
 var REPO_ROOT = path.resolve(APP_ROOT, "..", "..");
 var ELECTRON_DIR = path.join(APP_ROOT, "electron");
 var PYTHON_CACHE_PATH = "C:\\Users\\willp\\.cache\\huggingface\\transformers";
-var ELECTRON_DIST = path.join(APP_ROOT, "dist-electron");
 var RENDERER_DIST = path.join(APP_ROOT, "dist");
 var RENDERER_DEV_URL = "http://localhost:5173";
 var PROTO_PATH = path.join(REPO_ROOT, "shared", "proto", "dictation.proto");
