@@ -23,6 +23,7 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // electron/main.ts
 var import_electron4 = require("electron");
+var import_node_fs3 = __toESM(require("fs"), 1);
 var import_node_path5 = __toESM(require("path"), 1);
 
 // electron/grpc-client.ts
@@ -184,6 +185,7 @@ var import_node_module = require("module");
 
 // electron/constants.ts
 var import_electron = require("electron");
+var import_node_os = __toESM(require("os"), 1);
 var import_node_path = __toESM(require("path"), 1);
 var IS_DEV = process.env.NODE_ENV === "development";
 var APP_ROOT = import_node_path.default.resolve(__dirname, "..");
@@ -192,7 +194,12 @@ var BACKEND_ROOT = import_node_path.default.join(RESOURCES_ROOT, "backend");
 var SHARED_ROOT = import_node_path.default.join(RESOURCES_ROOT, "shared");
 var CLIENT_ROOT = import_node_path.default.join(RESOURCES_ROOT, "client");
 var ELECTRON_DIR = import_node_path.default.join(APP_ROOT, "electron");
-var PYTHON_CACHE_PATH = "C:\\Users\\willp\\.cache\\huggingface\\transformers";
+var PYTHON_CACHE_PATH = import_node_path.default.join(
+  import_node_os.default.homedir(),
+  ".cache",
+  "huggingface",
+  "transformers"
+);
 var ELECTRON_DIST = import_node_path.default.join(APP_ROOT, "dist-electron");
 var RENDERER_DIST = import_node_path.default.join(APP_ROOT, "dist");
 var RENDERER_DEV_URL = "http://localhost:5173";
@@ -252,14 +259,45 @@ var ensureNativeAudioDeps = async (onLog) => {
 
 // electron/hotkeys.ts
 var import_uiohook_napi = require("uiohook-napi");
-var CTRL_KEYS = /* @__PURE__ */ new Set([29, 3613]);
-var ALT_KEYS = /* @__PURE__ */ new Set([56, 3640]);
-var registerHoldHotkey = ({ onActivate, onDeactivate }) => {
-  let ctrlDown = false;
-  let altDown = false;
+var MODIFIER_VARIANTS = {
+  29: /* @__PURE__ */ new Set([29, 3613]),
+  // Ctrl (left: 29, right: 3613)
+  42: /* @__PURE__ */ new Set([42, 3638]),
+  // Shift (left: 42, right: 3638)
+  56: /* @__PURE__ */ new Set([56, 3640]),
+  // Alt (left: 56, right: 3640)
+  3675: /* @__PURE__ */ new Set([3675, 3676])
+  // Win (left: 3675, right: 3676)
+};
+var key1Codes = /* @__PURE__ */ new Set();
+var key2Codes = /* @__PURE__ */ new Set();
+var updateHotkeyConfig = (preset) => {
+  switch (preset) {
+    case "ctrl+alt":
+      key1Codes = MODIFIER_VARIANTS[29];
+      key2Codes = MODIFIER_VARIANTS[56];
+      break;
+    case "ctrl+shift":
+      key1Codes = MODIFIER_VARIANTS[29];
+      key2Codes = MODIFIER_VARIANTS[42];
+      break;
+    case "alt+shift":
+      key1Codes = MODIFIER_VARIANTS[56];
+      key2Codes = MODIFIER_VARIANTS[42];
+      break;
+    case "win+alt":
+      key1Codes = MODIFIER_VARIANTS[3675];
+      key2Codes = MODIFIER_VARIANTS[56];
+      break;
+  }
+};
+var registerHoldHotkey = ({ onActivate, onDeactivate }, preset = "ctrl+alt") => {
+  updateHotkeyConfig(preset);
+  let key1Down = false;
+  let key2Down = false;
   let active = false;
   const updateState = () => {
-    const shouldBeActive = ctrlDown && altDown;
+    const shouldBeActive = key1Down && key2Down;
     if (shouldBeActive && !active) {
       active = true;
       onActivate();
@@ -269,20 +307,20 @@ var registerHoldHotkey = ({ onActivate, onDeactivate }) => {
     }
   };
   import_uiohook_napi.uIOhook.on("keydown", (event) => {
-    if (CTRL_KEYS.has(event.keycode)) {
-      ctrlDown = true;
+    if (key1Codes.has(event.keycode)) {
+      key1Down = true;
     }
-    if (ALT_KEYS.has(event.keycode)) {
-      altDown = true;
+    if (key2Codes.has(event.keycode)) {
+      key2Down = true;
     }
     updateState();
   });
   import_uiohook_napi.uIOhook.on("keyup", (event) => {
-    if (CTRL_KEYS.has(event.keycode)) {
-      ctrlDown = false;
+    if (key1Codes.has(event.keycode)) {
+      key1Down = false;
     }
-    if (ALT_KEYS.has(event.keycode)) {
-      altDown = false;
+    if (key2Codes.has(event.keycode)) {
+      key2Down = false;
     }
     updateState();
   });
@@ -342,9 +380,20 @@ var sendPaste = () => {
 var import_electron3 = require("electron");
 var import_node_fs = __toESM(require("fs"), 1);
 var import_node_path2 = __toESM(require("path"), 1);
+var HOTKEY_PRESETS = {
+  "ctrl+alt": [29, 56],
+  // Ctrl + Alt
+  "ctrl+shift": [29, 42],
+  // Ctrl + Shift
+  "alt+shift": [56, 42],
+  // Alt + Shift
+  "win+alt": [3675, 56]
+  // Win + Alt
+};
 var DEFAULT_SETTINGS = {
   hotkey: {
-    modifiers: [162, 164],
+    preset: "ctrl+alt",
+    modifiers: HOTKEY_PRESETS["ctrl+alt"],
     debounceMs: 40
   },
   audio: {
@@ -431,6 +480,7 @@ var runPythonCheck = (pythonPath, code) => {
 var checkPythonVersion = (pythonPath) => runPythonCheck(pythonPath, "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')");
 var checkTorch = (pythonPath) => runPythonCheck(pythonPath, "import torch; print('ok')") === "ok";
 var checkNemo = (pythonPath) => runPythonCheck(pythonPath, "import nemo; print('ok')") === "ok";
+var checkGrpc = (pythonPath) => runPythonCheck(pythonPath, "import grpc; print('ok')") === "ok";
 var checkCuda = (pythonPath) => runPythonCheck(pythonPath, "import torch; print('ok' if torch.cuda.is_available() else 'no')") === "ok";
 var isValidPython = (version) => {
   if (!version) {
@@ -440,7 +490,7 @@ var isValidPython = (version) => {
   if (!Number.isFinite(major) || !Number.isFinite(minor)) {
     return false;
   }
-  return major > 3 || major === 3 && minor >= 11;
+  return major === 3 && (minor === 11 || minor === 12);
 };
 var getPythonInfo = (pythonPath, checkDeps) => {
   if (!import_node_fs2.default.existsSync(pythonPath)) {
@@ -455,11 +505,13 @@ var getPythonInfo = (pythonPath, checkDeps) => {
     version: version ?? "",
     hasTorch: false,
     hasNemo: false,
+    hasGrpc: false,
     hasCuda: false
   };
   if (checkDeps) {
     info.hasTorch = checkTorch(pythonPath);
     info.hasNemo = checkNemo(pythonPath);
+    info.hasGrpc = checkGrpc(pythonPath);
     if (info.hasTorch) {
       info.hasCuda = checkCuda(pythonPath);
     }
@@ -583,7 +635,7 @@ var findPython = (appRoot, checkDeps = true) => {
     if (!info) {
       continue;
     }
-    if (!checkDeps || info.hasTorch && info.hasNemo) {
+    if (!checkDeps || info.hasTorch && info.hasNemo && info.hasGrpc) {
       return info;
     }
     if (!found) {
@@ -591,7 +643,11 @@ var findPython = (appRoot, checkDeps = true) => {
     }
   }
   if (found) {
-    const missing = [!found.hasTorch && "torch", !found.hasNemo && "nemo"].filter(Boolean).join(", ");
+    const missing = [
+      !found.hasTorch && "torch",
+      !found.hasNemo && "nemo",
+      !found.hasGrpc && "grpc"
+    ].filter(Boolean).join(", ");
     throw new BackendDepsError(
       `Python found but missing backend dependencies: ${missing}.`,
       found.executable
@@ -601,11 +657,46 @@ var findPython = (appRoot, checkDeps = true) => {
     "Python 3.11+ not found. Install Python or set KEYMUSE_PYTHON to your Python executable."
   );
 };
-var installBackendDeps = (pythonPath, backendRoot) => {
-  const requirements = import_node_path3.default.join(backendRoot, "requirements.txt");
-  (0, import_node_child_process2.execFileSync)(pythonPath, ["-m", "pip", "install", "-r", requirements], {
-    stdio: "inherit"
+var runPipInstall = (pythonPath, args, tempDir, onOutput) => {
+  return new Promise((resolve, reject) => {
+    var _a, _b;
+    const child = (0, import_node_child_process2.spawn)(pythonPath, ["-m", "pip", "install", ...args], {
+      windowsHide: true,
+      env: {
+        ...process.env,
+        ...tempDir ? { TEMP: tempDir, TMP: tempDir } : {},
+        PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      }
+    });
+    const handleOutput = (data) => {
+      const text = data.toString();
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) {
+          continue;
+        }
+        onOutput == null ? void 0 : onOutput(line.trim());
+      }
+    };
+    (_a = child.stdout) == null ? void 0 : _a.on("data", handleOutput);
+    (_b = child.stderr) == null ? void 0 : _b.on("data", handleOutput);
+    child.on("error", (error) => reject(error));
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`pip install exited with code ${code}`));
+      }
+    });
   });
+};
+var installBackendDepsAsync = async (pythonPath, backendRoot, tempDir, onOutput) => {
+  const requirements = import_node_path3.default.join(backendRoot, "requirements.txt");
+  if (tempDir) {
+    import_node_fs2.default.mkdirSync(tempDir, { recursive: true });
+  }
+  await runPipInstall(pythonPath, ["-r", requirements], tempDir, onOutput);
+  onOutput == null ? void 0 : onOutput("Ensuring numpy compatibility...");
+  await runPipInstall(pythonPath, ["numpy>=1.26.0,<2", "--force-reinstall"], tempDir, onOutput);
 };
 
 // electron/backend.ts
@@ -796,6 +887,7 @@ var ensureBackend = async () => {
     mainWindow == null ? void 0 : mainWindow.webContents.send("backend:status", { ready: false, detail: payload.status });
     mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", payload.status);
   };
+  const pipTempDir = import_node_path5.default.join(import_electron4.app.getPath("userData"), "pip-temp");
   try {
     const venvRoot = import_node_path5.default.join(import_electron4.app.getPath("userData"), "python", ".venv");
     const venvPython = resolveVenvPython(venvRoot);
@@ -803,10 +895,19 @@ var ensureBackend = async () => {
     if (venvInfo) {
       return venvInfo;
     }
+    if (import_node_fs3.default.existsSync(venvPython)) {
+      mainWindow == null ? void 0 : mainWindow.webContents.send(
+        "backend:log",
+        "Existing Python environment uses an unsupported version. Recreating..."
+      );
+      import_node_fs3.default.rmSync(venvRoot, { recursive: true, force: true });
+    }
     const basePython = findPython(APP_ROOT, false);
     const venvExecutable = ensureVenv(basePython.executable, venvRoot);
     updateStatus({ status: "Preparing Python environment..." });
-    installBackendDeps(venvExecutable, BACKEND_ROOT);
+    await installBackendDepsAsync(venvExecutable, BACKEND_ROOT, pipTempDir, (line) => {
+      mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", line);
+    });
     const ready = getPythonInfoForExecutable(venvExecutable, true);
     if (ready) {
       return ready;
@@ -823,7 +924,9 @@ var ensureBackend = async () => {
         message: "Python dependencies are missing. KeyMuse will install the required packages now."
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
-      installBackendDeps(error.pythonPath, BACKEND_ROOT);
+      await installBackendDepsAsync(error.pythonPath, BACKEND_ROOT, pipTempDir, (line) => {
+        mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", line);
+      });
       const venvInfo = getPythonInfoForExecutable(error.pythonPath, true);
       if (venvInfo) {
         return venvInfo;
@@ -857,6 +960,7 @@ var startBackendProcess = async () => {
     );
   }
   const python = await ensureBackend();
+  mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", `Using Python: ${python.executable}`);
   const backend = startBackend(python, {
     host: settings.backend.host,
     port: settings.backend.port,
@@ -871,6 +975,13 @@ var startBackendProcess = async () => {
     }
   });
   backendProcess = backend;
+  let backendExited = false;
+  backend.process.on("exit", (code) => {
+    backendExited = true;
+    const message = `Backend exited with code ${code ?? "unknown"}.`;
+    mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", message);
+    mainWindow == null ? void 0 : mainWindow.webContents.send("backend:status", { ready: false, detail: message });
+  });
   const grpc = createDictationClient(settings.backend.host, settings.backend.port);
   let ready = false;
   let attempts = 0;
@@ -884,6 +995,9 @@ var startBackendProcess = async () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     } catch (error) {
+      if (backendExited) {
+        throw error;
+      }
       attempts += 1;
       const message = "Waiting for backend...";
       mainWindow == null ? void 0 : mainWindow.webContents.send("backend:status", {
@@ -1016,6 +1130,7 @@ var waitForRenderer = () => new Promise((resolve) => {
   }
 });
 var startApp = async () => {
+  import_electron4.Menu.setApplicationMenu(null);
   createMainWindow();
   createOverlayWindow();
   createTray();
@@ -1025,10 +1140,13 @@ var startApp = async () => {
   mainWindow == null ? void 0 : mainWindow.webContents.send("backend:status", { ready: false, detail: "Initializing..." });
   mainWindow == null ? void 0 : mainWindow.webContents.send("backend:log", "Initializing backend...");
   await startBackendProcess();
-  registerHoldHotkey({
-    onActivate: startDictation,
-    onDeactivate: stopDictation
-  });
+  registerHoldHotkey(
+    {
+      onActivate: startDictation,
+      onDeactivate: stopDictation
+    },
+    settings.hotkey.preset
+  );
 };
 process.on("unhandledRejection", (reason) => {
   const message = reason instanceof Error ? reason.message : "Unhandled rejection";

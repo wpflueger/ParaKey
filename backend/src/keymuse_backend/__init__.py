@@ -4,7 +4,6 @@ from keymuse_backend.config import BackendConfig, load_config_from_env
 from keymuse_backend.engine import (
     EngineEvent,
     InferenceEngine,
-    MockInferenceEngine,
     create_engine,
 )
 from keymuse_backend.server import BackendServer
@@ -18,7 +17,6 @@ __all__ = [
     "DictationService",
     "EngineEvent",
     "InferenceEngine",
-    "MockInferenceEngine",
     "create_engine",
     "load_config_from_env",
     "__version__",

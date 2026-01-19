@@ -52,10 +52,40 @@ button:hover {
   box-shadow: 0 6px 12px rgba(43, 43, 43, 0.2);
 }
 
+button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 2px 4px rgba(43, 43, 43, 0.15);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--hunter-green-600);
+  outline-offset: 2px;
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+button.icon-btn {
+  padding: 8px;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+}
+
 button.ghost {
   background: transparent;
   color: var(--graphite);
   border: 1px solid var(--pale-oak-600);
+}
+
+button.ghost:hover {
+  background: var(--pale-oak-700);
+  border-color: var(--pale-oak-400);
 }
 
 button.primary {
@@ -90,6 +120,12 @@ button.small {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.status-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(112, 139, 117, 0.2);
 }
 
 .startup-card {
@@ -129,6 +165,20 @@ button.small {
 
 .status-card .dot.neutral {
   background: var(--pale-oak);
+}
+
+.status-card .dot.recording {
+  background: var(--color-recording);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(243, 107, 86, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(243, 107, 86, 0);
+  }
 }
 
 .progress-bar {
@@ -226,11 +276,14 @@ button.small {
   background: rgba(47, 93, 58, 0.16);
   color: var(--hunter-green);
   font-size: 12px;
+  border: 1px solid rgba(47, 93, 58, 0.2);
+  transition: background 0.2s ease;
 }
 
 .status-grid .pill.muted {
   background: var(--pale-oak-700);
   color: var(--dusty-olive);
+  border: 1px solid var(--pale-oak-600);
 }
 
 .status-grid .tone-recording {
@@ -280,6 +333,12 @@ button.small {
   border-radius: 14px;
   background: var(--pale-oak-900);
   box-shadow: 0 8px 16px rgba(43, 43, 43, 0.08);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.history-item:hover {
+  transform: translateX(4px);
+  box-shadow: 0 10px 20px rgba(43, 43, 43, 0.1);
 }
 
 .history-item p {
@@ -300,6 +359,7 @@ button.small {
   display: grid;
   place-items: center;
   padding: 20px;
+  animation: fadeIn 0.2s ease;
 }
 
 .modal {
@@ -311,6 +371,39 @@ button.small {
   flex-direction: column;
   gap: 16px;
   box-shadow: 0 20px 40px rgba(43, 43, 43, 0.2);
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.modal .section-title {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--dusty-olive);
+  margin: 8px 0 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--pale-oak-600);
+}
+
+.modal .section-title:first-of-type {
+  border-top: none;
+  padding-top: 0;
+  margin-top: 0;
 }
 
 .modal header {
@@ -339,6 +432,48 @@ button.small {
   border-radius: 12px;
   border: 1px solid var(--pale-oak-600);
   background: var(--pale-oak-900);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modal input:hover,
+.modal select:hover {
+  border-color: var(--pale-oak-400);
+}
+
+.modal input:focus,
+.modal select:focus {
+  outline: none;
+  border-color: var(--hunter-green-600);
+  box-shadow: 0 0 0 3px rgba(47, 93, 58, 0.15);
+}
+
+/* Custom checkbox */
+.modal input[type="checkbox"] {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--pale-oak-400);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.modal input[type="checkbox"]:checked {
+  background: var(--hunter-green);
+  border-color: var(--hunter-green);
+}
+
+.modal input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 .modal .checkbox {

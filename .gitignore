@@ -69,3 +69,5 @@ DESIGN_REQUIREMENTS_v2.md
 PRODUCT_REQUIREMENTS_v2.md
 TECHNICAL_REQUIREMENTS_v2.md
 .hf_cache/*
+.claude/settings.local.json
+.claude/

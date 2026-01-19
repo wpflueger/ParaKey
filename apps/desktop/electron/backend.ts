@@ -83,8 +83,12 @@ export const startBackend = (
 };
 
 export const ensureBackendDeps = (python: PythonInfo): void => {
-  if (!python.hasTorch || !python.hasNemo) {
-    const missing = [!python.hasTorch && "torch", !python.hasNemo && "nemo"]
+  if (!python.hasTorch || !python.hasNemo || !python.hasGrpc) {
+    const missing = [
+      !python.hasTorch && "torch",
+      !python.hasNemo && "nemo",
+      !python.hasGrpc && "grpc",
+    ]
       .filter(Boolean)
       .join(", ");
     throw new BackendDepsError(

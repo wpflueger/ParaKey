@@ -2,9 +2,20 @@ import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 
+export type HotkeyPreset = "ctrl+alt" | "ctrl+shift" | "alt+shift" | "win+alt";
+
 export type HotkeySettings = {
+  preset: HotkeyPreset;
   modifiers: number[];
   debounceMs: number;
+};
+
+// uIOhook keycodes for modifier keys
+export const HOTKEY_PRESETS: Record<HotkeyPreset, number[]> = {
+  "ctrl+alt": [29, 56],      // Ctrl + Alt
+  "ctrl+shift": [29, 42],    // Ctrl + Shift
+  "alt+shift": [56, 42],     // Alt + Shift
+  "win+alt": [3675, 56],     // Win + Alt
 };
 
 export type AudioSettings = {
@@ -41,7 +52,8 @@ export type AppSettings = {
 
 const DEFAULT_SETTINGS: AppSettings = {
   hotkey: {
-    modifiers: [0xa2, 0xa4],
+    preset: "ctrl+alt",
+    modifiers: HOTKEY_PRESETS["ctrl+alt"],
     debounceMs: 40,
   },
   audio: {

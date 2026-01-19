@@ -5,8 +5,11 @@ export type BackendStatus = {
 
 export type DictationState = "IDLE" | "RECORDING" | "PROCESSING" | "INSERTING" | "ERROR";
 
+export type HotkeyPreset = "ctrl+alt" | "ctrl+shift" | "alt+shift" | "win+alt";
+
 export type AppSettings = {
   hotkey: {
+    preset: HotkeyPreset;
     modifiers: number[];
     debounceMs: number;
   };

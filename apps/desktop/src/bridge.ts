@@ -1,7 +1,7 @@
 import type { AppSettings } from "./types";
 
 const DEFAULT_SETTINGS: AppSettings = {
-  hotkey: { modifiers: [0xa2, 0xa4], debounceMs: 40 },
+  hotkey: { preset: "ctrl+alt", modifiers: [29, 56], debounceMs: 40 },
   audio: { deviceIndex: null, deviceName: null, sampleRateHz: 16000, channels: 1, frameMs: 20 },
   backend: { host: "127.0.0.1", port: 50051, timeoutSeconds: 30, autoReconnect: true },
   overlay: {

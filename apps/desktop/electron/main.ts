@@ -1,4 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, screen } from "electron";
+import fs from "node:fs";
 import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
 import { createAudioStream } from "./audio";
@@ -10,7 +11,7 @@ import { loadSettings, saveSettings } from "./settings";
 import type { AppSettings } from "./settings";
 import {
   findPython,
-  installBackendDeps,
+  installBackendDepsAsync,
   BackendDepsError,
   PythonNotFoundError,
   ensureVenv,
@@ -166,6 +167,8 @@ const ensureBackend = async () => {
     mainWindow?.webContents.send("backend:log", payload.status);
   };
 
+  const pipTempDir = path.join(app.getPath("userData"), "pip-temp");
+
   try {
     const venvRoot = path.join(app.getPath("userData"), "python", ".venv");
     const venvPython = resolveVenvPython(venvRoot);
@@ -174,10 +177,20 @@ const ensureBackend = async () => {
       return venvInfo;
     }
 
+    if (fs.existsSync(venvPython)) {
+      mainWindow?.webContents.send(
+        "backend:log",
+        "Existing Python environment uses an unsupported version. Recreating...",
+      );
+      fs.rmSync(venvRoot, { recursive: true, force: true });
+    }
+
     const basePython = findPython(APP_ROOT, false);
     const venvExecutable = ensureVenv(basePython.executable, venvRoot);
     updateStatus({ status: "Preparing Python environment..." });
-    installBackendDeps(venvExecutable, BACKEND_ROOT);
+    await installBackendDepsAsync(venvExecutable, BACKEND_ROOT, pipTempDir, (line) => {
+      mainWindow?.webContents.send("backend:log", line);
+    });
     const ready = getPythonInfoForExecutable(venvExecutable, true);
     if (ready) {
       return ready;
@@ -196,7 +209,9 @@ const ensureBackend = async () => {
           "Python dependencies are missing. KeyMuse will install the required packages now.",
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
-      installBackendDeps(error.pythonPath, BACKEND_ROOT);
+      await installBackendDepsAsync(error.pythonPath, BACKEND_ROOT, pipTempDir, (line) => {
+        mainWindow?.webContents.send("backend:log", line);
+      });
       const venvInfo = getPythonInfoForExecutable(error.pythonPath, true);
       if (venvInfo) {
         return venvInfo;
@@ -232,6 +247,7 @@ const startBackendProcess = async () => {
   }
 
   const python = await ensureBackend();
+  mainWindow?.webContents.send("backend:log", `Using Python: ${python.executable}`);
 
   const backend = startBackend(python, {
     host: settings.backend.host,
@@ -248,6 +264,13 @@ const startBackendProcess = async () => {
     },
   });
   backendProcess = backend;
+  let backendExited = false;
+  backend.process.on("exit", (code) => {
+    backendExited = true;
+    const message = `Backend exited with code ${code ?? "unknown"}.`;
+    mainWindow?.webContents.send("backend:log", message);
+    mainWindow?.webContents.send("backend:status", { ready: false, detail: message });
+  });
 
   const grpc = createDictationClient(settings.backend.host, settings.backend.port);
   let ready = false;
@@ -262,6 +285,9 @@ const startBackendProcess = async () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     } catch (error) {
+      if (backendExited) {
+        throw error;
+      }
       attempts += 1;
       const message = "Waiting for backend...";
       mainWindow?.webContents.send("backend:status", {
@@ -414,6 +440,7 @@ const waitForRenderer = (): Promise<void> =>
   });
 
 const startApp = async () => {
+  Menu.setApplicationMenu(null);
   createMainWindow();
   createOverlayWindow();
   createTray();
@@ -424,10 +451,13 @@ const startApp = async () => {
   mainWindow?.webContents.send("backend:log", "Initializing backend...");
   await startBackendProcess();
 
-  registerHoldHotkey({
-    onActivate: startDictation,
-    onDeactivate: stopDictation,
-  });
+  registerHoldHotkey(
+    {
+      onActivate: startDictation,
+      onDeactivate: stopDictation,
+    },
+    settings.hotkey.preset,
+  );
 };
 
 process.on("unhandledRejection", (reason) => {

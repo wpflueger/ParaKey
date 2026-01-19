@@ -1,5 +1,5 @@
 import path from "node:path";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 
 export type PythonInfo = {
@@ -7,6 +7,7 @@ export type PythonInfo = {
   version: string;
   hasTorch: boolean;
   hasNemo: boolean;
+  hasGrpc: boolean;
   hasCuda: boolean;
 };
 
@@ -46,6 +47,9 @@ const checkTorch = (pythonPath: string): boolean =>
 const checkNemo = (pythonPath: string): boolean =>
   runPythonCheck(pythonPath, "import nemo; print('ok')") === "ok";
 
+const checkGrpc = (pythonPath: string): boolean =>
+  runPythonCheck(pythonPath, "import grpc; print('ok')") === "ok";
+
 const checkCuda = (pythonPath: string): boolean =>
   runPythonCheck(pythonPath, "import torch; print('ok' if torch.cuda.is_available() else 'no')") === "ok";
 
@@ -57,7 +61,7 @@ const isValidPython = (version: string | null): boolean => {
   if (!Number.isFinite(major) || !Number.isFinite(minor)) {
     return false;
   }
-  return major > 3 || (major === 3 && minor >= 11);
+  return major === 3 && (minor === 11 || minor === 12);
 };
 
 const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | null => {
@@ -73,12 +77,14 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
     version: version ?? "",
     hasTorch: false,
     hasNemo: false,
+    hasGrpc: false,
     hasCuda: false,
   };
 
   if (checkDeps) {
     info.hasTorch = checkTorch(pythonPath);
     info.hasNemo = checkNemo(pythonPath);
+    info.hasGrpc = checkGrpc(pythonPath);
     if (info.hasTorch) {
       info.hasCuda = checkCuda(pythonPath);
     }
@@ -220,7 +226,7 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
     if (!info) {
       continue;
     }
-    if (!checkDeps || (info.hasTorch && info.hasNemo)) {
+    if (!checkDeps || (info.hasTorch && info.hasNemo && info.hasGrpc)) {
       return info;
     }
     if (!found) {
@@ -229,7 +235,13 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   }
 
   if (found) {
-    const missing = [!found.hasTorch && "torch", !found.hasNemo && "nemo"].filter(Boolean).join(", ");
+    const missing = [
+      !found.hasTorch && "torch",
+      !found.hasNemo && "nemo",
+      !found.hasGrpc && "grpc",
+    ]
+      .filter(Boolean)
+      .join(", ");
     throw new BackendDepsError(
       `Python found but missing backend dependencies: ${missing}.`,
       found.executable,
@@ -241,9 +253,80 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   );
 };
 
-export const installBackendDeps = (pythonPath: string, backendRoot: string): void => {
+export const installBackendDeps = (
+  pythonPath: string,
+  backendRoot: string,
+  tempDir?: string,
+): void => {
   const requirements = path.join(backendRoot, "requirements.txt");
+  if (tempDir) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
   execFileSync(pythonPath, ["-m", "pip", "install", "-r", requirements], {
     stdio: "inherit",
+    env: {
+      ...process.env,
+      ...(tempDir ? { TEMP: tempDir, TMP: tempDir } : {}),
+      PIP_DISABLE_PIP_VERSION_CHECK: "1",
+    },
   });
+};
+
+const runPipInstall = (
+  pythonPath: string,
+  args: string[],
+  tempDir?: string,
+  onOutput?: (line: string) => void,
+): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const child = spawn(pythonPath, ["-m", "pip", "install", ...args], {
+      windowsHide: true,
+      env: {
+        ...process.env,
+        ...(tempDir ? { TEMP: tempDir, TMP: tempDir } : {}),
+        PIP_DISABLE_PIP_VERSION_CHECK: "1",
+      },
+    });
+
+    const handleOutput = (data: Buffer) => {
+      const text = data.toString();
+      for (const line of text.split(/\r?\n/)) {
+        if (!line.trim()) {
+          continue;
+        }
+        onOutput?.(line.trim());
+      }
+    };
+
+    child.stdout?.on("data", handleOutput);
+    child.stderr?.on("data", handleOutput);
+
+    child.on("error", (error) => reject(error));
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`pip install exited with code ${code}`));
+      }
+    });
+  });
+};
+
+export const installBackendDepsAsync = async (
+  pythonPath: string,
+  backendRoot: string,
+  tempDir?: string,
+  onOutput?: (line: string) => void,
+): Promise<void> => {
+  const requirements = path.join(backendRoot, "requirements.txt");
+  if (tempDir) {
+    fs.mkdirSync(tempDir, { recursive: true });
+  }
+
+  // Install main requirements
+  await runPipInstall(pythonPath, ["-r", requirements], tempDir, onOutput);
+
+  // Force numpy <2 to fix compatibility with torch/nemo compiled against numpy 1.x
+  onOutput?.("Ensuring numpy compatibility...");
+  await runPipInstall(pythonPath, ["numpy>=1.26.0,<2", "--force-reinstall"], tempDir, onOutput);
 };

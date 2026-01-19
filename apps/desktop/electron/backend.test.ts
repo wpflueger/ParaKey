@@ -30,6 +30,7 @@ const pythonInfo = {
   version: "3.11",
   hasTorch: true,
   hasNemo: true,
+  hasGrpc: true,
   hasCuda: false,
 };
 

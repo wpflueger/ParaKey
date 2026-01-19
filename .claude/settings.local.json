@@ -18,7 +18,9 @@
       "Bash(powershell -NoProfile -ExecutionPolicy Bypass -Command \"\ncd C:\\\\Users\\\\willp\\\\Projects\\\\KeyMuse\n.\\\\.venv\\\\Scripts\\\\python.exe -m pip install -r backend\\\\requirements.txt 2>&1\n\")",
       "Bash(powershell:*)",
       "Bash(/c/Users/willp/Projects/KeyMuse/dist/KeyMuse/KeyMuse.exe:*)",
-      "Bash(PYTHONPATH=\"shared/src:backend/src:client/src\" timeout 30 .venv/Scripts/python.exe:*)"
+      "Bash(PYTHONPATH=\"shared/src:backend/src:client/src\" timeout 30 .venv/Scripts/python.exe:*)",
+      "Bash(npm exec:*)",
+      "Bash(bun run tsc:*)"
     ]
   }
 }

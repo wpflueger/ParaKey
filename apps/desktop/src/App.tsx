@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import type { AppSettings, BackendStatus, DictationState } from "./types";
+import type { AppSettings, BackendStatus, DictationState, HotkeyPreset } from "./types";
 import { getBridge } from "./bridge";
 import "./App.css";
 
 const DEFAULT_STATUS: BackendStatus = { ready: false, detail: "Initializing..." };
+
+const formatHotkey = (preset: HotkeyPreset): string => {
+  switch (preset) {
+    case "ctrl+alt":
+      return "Ctrl+Alt";
+    case "ctrl+shift":
+      return "Ctrl+Shift";
+    case "alt+shift":
+      return "Alt+Shift";
+    case "win+alt":
+      return "Win+Alt";
+    default:
+      return "Ctrl+Alt";
+  }
+};
 
 const formatState = (state: DictationState): string => {
   switch (state) {
@@ -86,6 +101,16 @@ function App() {
       unsubCache();
     };
   }, []);
+
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showSettings) {
+        setShowSettings(false);
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [showSettings]);
 
   const handleSaveSettings = async (next: AppSettings) => {
     await getBridge().saveSettings(next);
@@ -180,7 +205,7 @@ function App() {
         <div>
           <p className="eyebrow">KeyMuse</p>
           <h1>Dictation Control Center</h1>
-          <p className="subtle">Press Ctrl+Alt to dictate anywhere.</p>
+          <p className="subtle">Press {formatHotkey(settings?.hotkey.preset ?? "ctrl+alt")} to dictate anywhere.</p>
         </div>
         <div className="header-actions">
           <button className="ghost" onClick={() => setShowLogs(true)}>
@@ -207,9 +232,14 @@ function App() {
           <span className={status.ready ? "pill" : "pill muted"}>{status.detail}</span>
         </div>
         <div className={`status-card ${statusTone(dictationState)}`}>
-          <p className="label">Dictation</p>
-          <p className="value">{formatState(dictationState)}</p>
-          <span className="pill">Ctrl+Alt</span>
+          <div className="status-line">
+            <span className={`dot ${dictationState === "RECORDING" ? "recording" : ""}`} />
+            <div>
+              <p className="label">Dictation</p>
+              <p className="value">{formatState(dictationState)}</p>
+            </div>
+          </div>
+          <span className="pill">{formatHotkey(settings?.hotkey.preset ?? "ctrl+alt")}</span>
         </div>
       </section>
 
@@ -226,7 +256,7 @@ function App() {
         {recentHistory.length === 0 ? (
           <div className="empty-state">
             <p>No transcripts yet.</p>
-            <p className="subtle">Hold Ctrl+Alt and speak to start dictating.</p>
+            <p className="subtle">Hold {formatHotkey(settings?.hotkey.preset ?? "ctrl+alt")} and speak to start dictating.</p>
           </div>
         ) : (
           <div className="history-list">
@@ -261,33 +291,28 @@ function App() {
               }}
             >
               <section>
-                <h3>Backend</h3>
+                <h3>Hotkey</h3>
                 <label>
-                  Host
-                  <input
-                    type="text"
-                    value={settings.backend.host}
+                  Dictation shortcut
+                  <select
+                    value={settings.hotkey.preset}
                     onChange={(event) =>
                       setSettings({
                         ...settings,
-                        backend: { ...settings.backend, host: event.target.value },
+                        hotkey: {
+                          ...settings.hotkey,
+                          preset: event.target.value as HotkeyPreset,
+                        },
                       })
                     }
-                  />
+                  >
+                    <option value="ctrl+alt">Ctrl + Alt</option>
+                    <option value="ctrl+shift">Ctrl + Shift</option>
+                    <option value="alt+shift">Alt + Shift</option>
+                    <option value="win+alt">Win + Alt</option>
+                  </select>
                 </label>
-                <label>
-                  Port
-                  <input
-                    type="number"
-                    value={settings.backend.port}
-                    onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        backend: { ...settings.backend, port: Number(event.target.value) },
-                      })
-                    }
-                  />
-                </label>
+                <p className="subtle">Hold the shortcut to record, release to transcribe. Restart required to apply.</p>
               </section>
               <section>
                 <h3>Overlay</h3>
