@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KeyMuse Overlay</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      }
+      body {
+        margin: 0;
+        background: transparent;
+        color: #f8f4ed;
+      }
+      .overlay {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(43, 43, 43, 0.88);
+        border: 1px solid rgba(217, 199, 163, 0.2);
+        font-size: 14px;
+        letter-spacing: 0.02em;
+      }
+      .dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #c4a76e;
+        box-shadow: 0 0 12px rgba(196, 167, 110, 0.6);
+      }
+      .mode-processing .dot {
+        background: #5d6798;
+        box-shadow: 0 0 12px rgba(93, 103, 152, 0.6);
+      }
+      .mode-inserted .dot {
+        background: #478d57;
+        box-shadow: 0 0 12px rgba(71, 141, 87, 0.6);
+      }
+      .mode-error .dot {
+        background: #d94c4c;
+        box-shadow: 0 0 12px rgba(217, 76, 76, 0.6);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="overlay" id="overlay">
+      <span class="dot"></span>
+      <span id="message">Listening...</span>
+    </div>
+    <script type="module">
+      const overlay = document.getElementById("overlay");
+      const message = document.getElementById("message");
+      window.overlay.onState(({ text, mode }) => {
+        message.textContent = text;
+        overlay.className = `overlay mode-${mode}`;
+      });
+    </script>
+  </body>
+</html>

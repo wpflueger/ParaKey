@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { BackendDepsError } from "./python-finder";
 import type { PythonInfo } from "./python-finder";
-import { BACKEND_ROOT, CLIENT_ROOT, SHARED_ROOT } from "./constants";
+import { BACKEND_ROOT, SHARED_ROOT } from "./constants";
 
 export type BackendStartOptions = {
   host: string;
@@ -22,7 +22,6 @@ const buildPythonPath = (): string => {
   const paths = [
     path.join(SHARED_ROOT, "src"),
     path.join(BACKEND_ROOT, "src"),
-    path.join(CLIENT_ROOT, "src"),
   ];
   const existing = process.env.PYTHONPATH;
   if (existing) {

@@ -20,7 +20,8 @@
       "Bash(/c/Users/willp/Projects/KeyMuse/dist/KeyMuse/KeyMuse.exe:*)",
       "Bash(PYTHONPATH=\"shared/src:backend/src:client/src\" timeout 30 .venv/Scripts/python.exe:*)",
       "Bash(npm exec:*)",
-      "Bash(bun run tsc:*)"
+      "Bash(bun run tsc:*)",
+      "Bash(dir:*)"
     ]
   }
 }

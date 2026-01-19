@@ -22,7 +22,7 @@ import { startBackend } from "./backend";
 import {
   APP_ROOT,
   BACKEND_ROOT,
-  ELECTRON_DIR,
+  ELECTRON_DIST,
   IS_DEV,
   PYTHON_CACHE_PATH,
   RENDERER_DEV_URL,
@@ -38,9 +38,35 @@ let backendReady = false;
 let audioController: Awaited<ReturnType<typeof createAudioStream>> | null = null;
 let dictationStream: ReturnType<typeof streamAudio> | null = null;
 let dictationActive = false;
+let isQuitting = false;
+
+// Safely send IPC message to main window (handles destroyed window)
+const sendToMain = (channel: string, ...args: unknown[]) => {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(channel, ...args);
+    }
+  } catch {
+    // Window was destroyed, ignore
+  }
+};
+
+const getIconPath = () => {
+  // In dev, icon is in public folder; in production, it's in dist (renderer output)
+  return IS_DEV
+    ? path.join(APP_ROOT, "public", "icons", "app.ico")
+    : path.join(RENDERER_DIST, "icons", "app.ico");
+};
+
+const getTrayIconPath = () => {
+  const trayFile = "tray-32.png";
+  return IS_DEV
+    ? path.join(APP_ROOT, "public", "icons", trayFile)
+    : path.join(RENDERER_DIST, "icons", trayFile);
+};
 
 const createMainWindow = () => {
-  const iconPath = path.join(APP_ROOT, "public", "logo.png");
+  const iconPath = getIconPath();
   mainWindow = new BrowserWindow({
     width: 420,
     height: 620,
@@ -64,7 +90,8 @@ const createMainWindow = () => {
   }
 
   mainWindow.on("close", (event) => {
-    if (tray) {
+    // Only hide to tray if tray exists and app isn't quitting
+    if (tray && !isQuitting) {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -89,7 +116,7 @@ const createOverlayWindow = () => {
   });
 
   overlayWindow.setIgnoreMouseEvents(true);
-  overlayWindow.loadFile(path.join(ELECTRON_DIR, "overlay.html"));
+  overlayWindow.loadFile(path.join(ELECTRON_DIST, "overlay.html"));
 };
 
 const positionOverlay = (mode: AppSettings["overlay"]["position"]) => {
@@ -127,14 +154,21 @@ const hideOverlay = () => {
 };
 
 const createTray = () => {
-  const iconPath = path.join(APP_ROOT, "public", "logo.png");
+  const iconPath = getTrayIconPath();
+  console.log("Loading tray icon from:", iconPath);
   const trayImage = nativeImage.createFromPath(iconPath);
   if (trayImage.isEmpty()) {
-    console.warn("Tray icon could not be loaded. Please provide a PNG or ICO for Windows.");
-    mainWindow?.show();
-    return;
+    console.warn("Tray icon could not be loaded from:", iconPath);
+    // Try to create tray with a default icon anyway
+    try {
+      tray = new Tray(nativeImage.createEmpty());
+    } catch {
+      console.error("Failed to create tray");
+      return;
+    }
+  } else {
+    tray = new Tray(trayImage);
   }
-  tray = new Tray(trayImage);
   const contextMenu = Menu.buildFromTemplate([
     {
       label: "Show Window",
@@ -162,9 +196,9 @@ const createTray = () => {
 
 const ensureBackend = async () => {
   const updateStatus = (payload: { status: string }) => {
-    mainWindow?.webContents.send("install:status", payload);
-    mainWindow?.webContents.send("backend:status", { ready: false, detail: payload.status });
-    mainWindow?.webContents.send("backend:log", payload.status);
+    sendToMain("install:status", payload);
+    sendToMain("backend:status", { ready: false, detail: payload.status });
+    sendToMain("backend:log", payload.status);
   };
 
   const pipTempDir = path.join(app.getPath("userData"), "pip-temp");
@@ -178,7 +212,7 @@ const ensureBackend = async () => {
     }
 
     if (fs.existsSync(venvPython)) {
-      mainWindow?.webContents.send(
+      sendToMain(
         "backend:log",
         "Existing Python environment uses an unsupported version. Recreating...",
       );
@@ -189,7 +223,7 @@ const ensureBackend = async () => {
     const venvExecutable = ensureVenv(basePython.executable, venvRoot);
     updateStatus({ status: "Preparing Python environment..." });
     await installBackendDepsAsync(venvExecutable, BACKEND_ROOT, pipTempDir, (line) => {
-      mainWindow?.webContents.send("backend:log", line);
+      sendToMain("backend:log", line);
     });
     const ready = getPythonInfoForExecutable(venvExecutable, true);
     if (ready) {
@@ -210,7 +244,7 @@ const ensureBackend = async () => {
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
       await installBackendDepsAsync(error.pythonPath, BACKEND_ROOT, pipTempDir, (line) => {
-        mainWindow?.webContents.send("backend:log", line);
+        sendToMain("backend:log", line);
       });
       const venvInfo = getPythonInfoForExecutable(error.pythonPath, true);
       if (venvInfo) {
@@ -223,7 +257,7 @@ const ensureBackend = async () => {
         "Python Required",
         "Python 3.11+ is required to run the speech model. Install Python and restart KeyMuse.",
       );
-      mainWindow?.webContents.send("startup:error", {
+      sendToMain("startup:error", {
         message: "Python 3.11+ not found. Install Python and restart KeyMuse.",
       });
     }
@@ -233,30 +267,30 @@ const ensureBackend = async () => {
 
 const startBackendProcess = async () => {
   const nativeDeps = await ensureNativeAudioDeps((line) => {
-    mainWindow?.webContents.send("backend:log", line);
+    sendToMain("backend:log", line);
   });
   if (!nativeDeps.ok) {
-    mainWindow?.webContents.send(
+    sendToMain(
       "backend:log",
       "Audio capture will be unavailable until native modules rebuild successfully.",
     );
-    mainWindow?.webContents.send(
+    sendToMain(
       "backend:log",
       "Tip: set PYTHON to Python 3.11 or install setuptools for your Python 3.12 runtime.",
     );
   }
 
   const python = await ensureBackend();
-  mainWindow?.webContents.send("backend:log", `Using Python: ${python.executable}`);
+  sendToMain("backend:log", `Using Python: ${python.executable}`);
 
   const backend = startBackend(python, {
     host: settings.backend.host,
     port: settings.backend.port,
     onOutput: (line) => {
-      mainWindow?.webContents.send("backend:log", line);
+      sendToMain("backend:log", line);
       // Only send status updates before the backend is ready
       if (!backendReady) {
-        mainWindow?.webContents.send("backend:status", {
+        sendToMain("backend:status", {
           ready: false,
           detail: line,
         });
@@ -268,8 +302,8 @@ const startBackendProcess = async () => {
   backend.process.on("exit", (code) => {
     backendExited = true;
     const message = `Backend exited with code ${code ?? "unknown"}.`;
-    mainWindow?.webContents.send("backend:log", message);
-    mainWindow?.webContents.send("backend:status", { ready: false, detail: message });
+    sendToMain("backend:log", message);
+    sendToMain("backend:status", { ready: false, detail: message });
   });
 
   const grpc = createDictationClient(settings.backend.host, settings.backend.port);
@@ -278,7 +312,7 @@ const startBackendProcess = async () => {
   while (!ready) {
     try {
       const health = await grpc.GetHealth({});
-      mainWindow?.webContents.send("backend:status", { ready: health.ready, detail: health.detail });
+      sendToMain("backend:status", { ready: health.ready, detail: health.detail });
       ready = health.ready;
       backendReady = health.ready;
       if (!ready) {
@@ -290,15 +324,15 @@ const startBackendProcess = async () => {
       }
       attempts += 1;
       const message = "Waiting for backend...";
-      mainWindow?.webContents.send("backend:status", {
+      sendToMain("backend:status", {
         ready: false,
         detail: message,
       });
       if (attempts === 1) {
         const errorMessage = error instanceof Error ? error.message : "Health check failed";
-        mainWindow?.webContents.send("backend:log", `Health check failed: ${errorMessage}`);
+        sendToMain("backend:log", `Health check failed: ${errorMessage}`);
       } else if (attempts % 5 === 0) {
-        mainWindow?.webContents.send("backend:log", `${message} (${attempts})`);
+        sendToMain("backend:log", `${message} (${attempts})`);
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
@@ -310,7 +344,7 @@ const startDictation = async () => {
     return;
   }
   dictationActive = true;
-  mainWindow?.webContents.send("dictation:state", { state: "RECORDING" });
+  sendToMain("dictation:state", { state: "RECORDING" });
   showOverlay("Listening...", "listening");
 
   const grpc = createDictationClient(settings.backend.host, settings.backend.port);
@@ -323,18 +357,18 @@ const startDictation = async () => {
       if (event.final) {
         const sanitized = sanitizeText(event.final.text);
         addTranscript(sanitized);
-        mainWindow?.webContents.send("dictation:final", { text: sanitized });
+        sendToMain("dictation:final", { text: sanitized });
         setClipboardText(sanitized);
         sendPaste();
         showOverlay(`Inserted: ${sanitized.slice(0, 30)}`, "inserted");
       }
       if (event.error) {
-        mainWindow?.webContents.send("dictation:state", { state: "ERROR" });
+        sendToMain("dictation:state", { state: "ERROR" });
         showOverlay(event.error.message, "error");
       }
     },
     (error) => {
-      mainWindow?.webContents.send("dictation:state", { state: "ERROR" });
+      sendToMain("dictation:state", { state: "ERROR" });
       showOverlay(error.message, "error");
     },
   );
@@ -349,8 +383,8 @@ const startDictation = async () => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Audio capture failed.";
-    mainWindow?.webContents.send("backend:log", message);
-    mainWindow?.webContents.send("dictation:state", { state: "ERROR" });
+    sendToMain("backend:log", message);
+    sendToMain("dictation:state", { state: "ERROR" });
     showOverlay(message, "error");
     return;
   }
@@ -366,7 +400,7 @@ const stopDictation = async () => {
     return;
   }
   dictationActive = false;
-  mainWindow?.webContents.send("dictation:state", { state: "PROCESSING" });
+  sendToMain("dictation:state", { state: "PROCESSING" });
   showOverlay("Processing...", "processing");
 
   // Brief delay to capture any trailing audio still being spoken
@@ -391,7 +425,7 @@ const stopDictation = async () => {
   if (stream) {
     await new Promise<void>((resolve) => {
       const timeout = setTimeout(() => {
-        mainWindow?.webContents.send("backend:log", "Transcription timeout");
+        sendToMain("backend:log", "Transcription timeout");
         resolve();
       }, 30000);
 
@@ -408,7 +442,7 @@ const stopDictation = async () => {
 
   dictationStream = null;
   hideOverlay();
-  mainWindow?.webContents.send("dictation:state", { state: "IDLE" });
+  sendToMain("dictation:state", { state: "IDLE" });
 };
 
 const wireIpc = () => {
@@ -446,9 +480,9 @@ const startApp = async () => {
   createTray();
   wireIpc();
   await waitForRenderer();
-  mainWindow?.webContents.send("startup:cache", { path: PYTHON_CACHE_PATH });
-  mainWindow?.webContents.send("backend:status", { ready: false, detail: "Initializing..." });
-  mainWindow?.webContents.send("backend:log", "Initializing backend...");
+  sendToMain("startup:cache", { path: PYTHON_CACHE_PATH });
+  sendToMain("backend:status", { ready: false, detail: "Initializing..." });
+  sendToMain("backend:log", "Initializing backend...");
   await startBackendProcess();
 
   registerHoldHotkey(
@@ -462,7 +496,7 @@ const startApp = async () => {
 
 process.on("unhandledRejection", (reason) => {
   const message = reason instanceof Error ? reason.message : "Unhandled rejection";
-  mainWindow?.webContents.send("backend:log", `Unhandled: ${message}`);
+  sendToMain("backend:log", `Unhandled: ${message}`);
 });
 
 app.whenReady().then(startApp);
@@ -472,6 +506,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("before-quit", () => {
+  isQuitting = true;
   stopHotkeyListener();
   backendProcess?.kill();
   tray?.destroy();

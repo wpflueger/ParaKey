@@ -10,7 +10,7 @@
     "electron:dev": "bunx wait-on http://localhost:5173 dist-electron/preload.cjs dist-electron/main.cjs && bun run electron:start",
     "electron:start": "electron .",
     "build:renderer": "tsc -b && vite build",
-    "build:electron": "tsup",
+    "build:electron": "tsup && node -e \"require('fs').copyFileSync('electron/overlay.html', 'dist-electron/overlay.html')\"",
     "build": "bun run build:renderer && bun run build:electron",
     "dist": "bun run build && electron-builder --win",
     "lint": "eslint .",
@@ -74,10 +74,6 @@
       {
         "from": "../../shared/proto",
         "to": "shared/proto"
-      },
-      {
-        "from": "../../client/src",
-        "to": "client/src"
       }
     ],
     "files": [
@@ -85,7 +81,14 @@
       "dist/**/*"
     ],
     "win": {
+      "icon": "public/icons/app.ico",
       "target": "nsis"
+    },
+    "nsis": {
+      "installerIcon": "public/icons/app.ico",
+      "uninstallerIcon": "public/icons/app.ico",
+      "installerHeader": "public/icons/installer-header-150x57.png",
+      "installerSidebar": "public/icons/installer-sidebar-164x314.png"
     }
   }
 }

@@ -12,7 +12,6 @@ export const RESOURCES_ROOT = app.isPackaged
 
 export const BACKEND_ROOT = path.join(RESOURCES_ROOT, "backend");
 export const SHARED_ROOT = path.join(RESOURCES_ROOT, "shared");
-export const CLIENT_ROOT = path.join(RESOURCES_ROOT, "client");
 
 export const ELECTRON_DIR = path.join(APP_ROOT, "electron");
 export const PYTHON_CACHE_PATH = path.join(
