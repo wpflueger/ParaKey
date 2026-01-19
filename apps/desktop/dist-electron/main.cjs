@@ -777,7 +777,11 @@ var sendToMain = (channel, ...args) => {
   }
 };
 var getIconPath = () => {
-  return IS_DEV ? import_node_path5.default.join(APP_ROOT, "public", "logo.png") : import_node_path5.default.join(RENDERER_DIST, "logo.png");
+  return IS_DEV ? import_node_path5.default.join(APP_ROOT, "public", "icons", "app.ico") : import_node_path5.default.join(RENDERER_DIST, "icons", "app.ico");
+};
+var getTrayIconPath = () => {
+  const trayFile = "tray-32.png";
+  return IS_DEV ? import_node_path5.default.join(APP_ROOT, "public", "icons", trayFile) : import_node_path5.default.join(RENDERER_DIST, "icons", trayFile);
 };
 var createMainWindow = () => {
   const iconPath = getIconPath();
@@ -859,7 +863,7 @@ var hideOverlay = () => {
   overlayWindow == null ? void 0 : overlayWindow.hide();
 };
 var createTray = () => {
-  const iconPath = getIconPath();
+  const iconPath = getTrayIconPath();
   console.log("Loading tray icon from:", iconPath);
   const trayImage = import_electron4.nativeImage.createFromPath(iconPath);
   if (trayImage.isEmpty()) {
