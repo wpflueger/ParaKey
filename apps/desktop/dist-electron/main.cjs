@@ -192,7 +192,6 @@ var APP_ROOT = import_node_path.default.resolve(__dirname, "..");
 var RESOURCES_ROOT = import_electron.app.isPackaged ? process.resourcesPath : import_node_path.default.resolve(APP_ROOT, "..", "..");
 var BACKEND_ROOT = import_node_path.default.join(RESOURCES_ROOT, "backend");
 var SHARED_ROOT = import_node_path.default.join(RESOURCES_ROOT, "shared");
-var ELECTRON_DIR = import_node_path.default.join(APP_ROOT, "electron");
 var PYTHON_CACHE_PATH = import_node_path.default.join(
   import_node_os.default.homedir(),
   ".cache",
