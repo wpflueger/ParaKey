@@ -664,7 +664,7 @@ var audioController = null;
 var dictationStream = null;
 var dictationActive = false;
 var createMainWindow = () => {
-  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "km_logo.png");
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.svg");
   mainWindow = new import_electron3.BrowserWindow({
     width: 420,
     height: 620,
@@ -743,7 +743,7 @@ var hideOverlay = () => {
   overlayWindow == null ? void 0 : overlayWindow.hide();
 };
 var createTray = () => {
-  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "km_logo.png");
+  const iconPath = import_node_path5.default.join(APP_ROOT, "public", "logo.svg");
   tray = new import_electron3.Tray(iconPath);
   const contextMenu = import_electron3.Menu.buildFromTemplate([
     {

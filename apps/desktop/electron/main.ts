@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, screen } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, Tray, screen } from "electron";
 import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
 import { createAudioStream } from "./audio";
