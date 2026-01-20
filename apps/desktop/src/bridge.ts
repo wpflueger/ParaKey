@@ -33,7 +33,7 @@ export const getBridge = () => {
     getSettings: async () => DEFAULT_SETTINGS,
     saveSettings: async () => undefined,
     requestHistory: async () => [],
-    requestCachePath: async () => "C:\\Users\\willp\\.cache\\huggingface\\transformers",
+    requestCachePath: async () => "",
     startDictation: async () => undefined,
     stopDictation: async () => undefined,
     showMainWindow: async () => undefined,

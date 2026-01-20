@@ -11,7 +11,7 @@ const stubBridge = () => ({
   onStartupError: () => () => {},
   onCachePath: () => () => {},
   getSettings: async () => ({
-    hotkey: { modifiers: [0xa2, 0xa4], debounceMs: 40 },
+    hotkey: { preset: "ctrl+alt", modifiers: [0xa2, 0xa4], debounceMs: 40 },
     audio: { deviceIndex: null, deviceName: null, sampleRateHz: 16000, channels: 1, frameMs: 20 },
     backend: { host: "127.0.0.1", port: 50051, timeoutSeconds: 30, autoReconnect: true },
     overlay: { enabled: true, position: "top-right", xOffset: 20, yOffset: 20, autoHideMs: 2000 },
@@ -20,7 +20,7 @@ const stubBridge = () => ({
   }),
   saveSettings: async () => undefined,
   requestHistory: async () => [],
-  requestCachePath: async () => "C:\\Users\\willp\\.cache\\huggingface\\transformers",
+  requestCachePath: async () => "",
   startDictation: async () => undefined,
   stopDictation: async () => undefined,
   showMainWindow: async () => undefined,
