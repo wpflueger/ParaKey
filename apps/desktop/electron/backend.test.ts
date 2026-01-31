@@ -45,11 +45,11 @@ describe("startBackend", () => {
 
     expect(spawn).toHaveBeenCalledWith(
       pythonInfo.executable,
-      ["-m", "keymuse_backend.server"],
+      ["-m", "parakey_backend.server"],
       expect.objectContaining({
         env: expect.objectContaining({
-          KEYMUSE_HOST: "127.0.0.1",
-          KEYMUSE_PORT: "50051",
+          PARAKEY_HOST: "127.0.0.1",
+          PARAKEY_PORT: "50051",
           PYTHONUNBUFFERED: "1",
         }),
       }),

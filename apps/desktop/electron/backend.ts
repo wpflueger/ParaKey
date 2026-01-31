@@ -37,22 +37,22 @@ export const startBackend = (
   const env: Record<string, string> = {
     ...process.env,
     PYTHONPATH: buildPythonPath(),
-    KEYMUSE_HOST: options.host,
-    KEYMUSE_PORT: String(options.port),
+    PARAKEY_HOST: options.host,
+    PARAKEY_PORT: String(options.port),
     PYTHONUNBUFFERED: "1",
   };
 
   if (options.mode) {
-    env.KEYMUSE_MODE = options.mode;
+    env.PARAKEY_MODE = options.mode;
   }
   if (options.device) {
-    env.KEYMUSE_DEVICE = options.device;
+    env.PARAKEY_DEVICE = options.device;
   }
   if (options.model) {
-    env.KEYMUSE_MODEL = options.model;
+    env.PARAKEY_MODEL = options.model;
   }
 
-  const cmd = ["-m", "keymuse_backend.server"];
+  const cmd = ["-m", "parakey_backend.server"];
   const child = spawn(python.executable, cmd, {
     env,
     windowsHide: true,

@@ -189,7 +189,7 @@ const createTray = () => {
       click: () => app.quit(),
     },
   ]);
-  tray.setToolTip("KeyMuse - Press Ctrl+Alt to dictate");
+  tray.setToolTip("ParaKey - Press Ctrl+Alt to dictate");
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow?.show());
 };
@@ -240,7 +240,7 @@ const ensureBackend = async () => {
         type: "info",
         title: "Installing Dependencies",
         message:
-          "Python dependencies are missing. KeyMuse will install the required packages now.",
+          "Python dependencies are missing. ParaKey will install the required packages now.",
       });
       updateStatus({ status: "Missing Python dependencies. Installing..." });
       await installBackendDepsAsync(error.pythonPath, BACKEND_ROOT, pipTempDir, (line) => {
@@ -255,10 +255,10 @@ const ensureBackend = async () => {
     if (error instanceof PythonNotFoundError) {
       dialog.showErrorBox(
         "Python Required",
-        "Python 3.11+ is required to run the speech model. Install Python and restart KeyMuse.",
+        "Python 3.11+ is required to run the speech model. Install Python and restart ParaKey.",
       );
       sendToMain("startup:error", {
-        message: "Python 3.11+ not found. Install Python and restart KeyMuse.",
+        message: "Python 3.11+ not found. Install Python and restart ParaKey.",
       });
     }
     throw error;

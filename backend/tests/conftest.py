@@ -1,4 +1,4 @@
-"""Pytest configuration and fixtures for KeyMuse backend tests."""
+"""Pytest configuration and fixtures for ParaKey backend tests."""
 
 from __future__ import annotations
 

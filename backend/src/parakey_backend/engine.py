@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Optional
 
-from keymuse_backend.config import BackendConfig
+from parakey_backend.config import BackendConfig
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class InferenceEngine:
             return
 
         try:
-            from keymuse_backend.model import ModelLoader
+            from parakey_backend.model import ModelLoader
 
             self._model_loader = ModelLoader(
                 model_name=self._config.model_name,

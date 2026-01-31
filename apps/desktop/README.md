@@ -1,6 +1,6 @@
-# KeyMuse Desktop
+# ParaKey Desktop
 
-Electron + React 19 + Vite (TypeScript) desktop UI for KeyMuse.
+Electron + React 19 + Vite (TypeScript) desktop UI for ParaKey.
 
 ## Development
 
@@ -13,7 +13,7 @@ bun run dev
 
 ## Native modules
 
-If `naudiodon` fails to load, KeyMuse will attempt to rebuild it on startup.
+If `naudiodon` fails to load, ParaKey will attempt to rebuild it on startup.
 You can also run it manually:
 
 ```powershell

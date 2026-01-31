@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package keymuse.dictation.v1;
+package parakey.dictation.v1;
 
 service DictationService {
   rpc StreamAudio (stream AudioFrame) returns (stream DictationEvent);

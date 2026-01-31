@@ -125,7 +125,7 @@ function App() {
       <div className="app logs">
         <header className="main-header">
           <div>
-            <p className="eyebrow">KeyMuse</p>
+            <p className="eyebrow">ParaKey</p>
             <h1>Backend Logs</h1>
             <p className="subtle">Real-time backend output for debugging.</p>
           </div>
@@ -160,7 +160,7 @@ function App() {
       <div className="app startup">
         <header className="startup-header">
           <div>
-            <p className="eyebrow">KeyMuse</p>
+            <p className="eyebrow">ParaKey</p>
             <h1>Preparing your dictation engine</h1>
           </div>
           <button className="ghost" onClick={() => getBridge().minimizeToTray()}>
@@ -203,7 +203,7 @@ function App() {
     <div className="app main">
       <header className="main-header">
         <div>
-          <p className="eyebrow">KeyMuse</p>
+          <p className="eyebrow">ParaKey</p>
           <h1>Dictation Control Center</h1>
           <p className="subtle">Press {formatHotkey(settings?.hotkey.preset ?? "ctrl+alt")} to dictate anywhere.</p>
         </div>

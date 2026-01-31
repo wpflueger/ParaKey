@@ -4,7 +4,7 @@ from typing import AsyncIterable, AsyncIterator, cast
 
 import grpc
 
-from keymuse_proto import dictation_pb2
+from parakey_proto import dictation_pb2
 
 
 class DictationServiceServicer:
@@ -26,12 +26,12 @@ class DictationServiceServicer:
 class DictationServiceStub:
     def __init__(self, channel: grpc.aio.Channel) -> None:
         self._stream_audio = channel.stream_stream(
-            "/keymuse.dictation.v1.DictationService/StreamAudio",
+            "/parakey.dictation.v1.DictationService/StreamAudio",
             request_serializer=dictation_pb2.serialize_audio_frame,
             response_deserializer=dictation_pb2.deserialize_dictation_event,
         )
         self._get_health = channel.unary_unary(
-            "/keymuse.dictation.v1.DictationService/GetHealth",
+            "/parakey.dictation.v1.DictationService/GetHealth",
             request_serializer=dictation_pb2.serialize_health_request,
             response_deserializer=dictation_pb2.deserialize_health_status,
         )
@@ -66,7 +66,7 @@ def add_DictationServiceServicer_to_server(
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-        "keymuse.dictation.v1.DictationService", rpc_method_handlers
+        "parakey.dictation.v1.DictationService", rpc_method_handlers
     )
     server.add_generic_rpc_handlers((generic_handler,))
 

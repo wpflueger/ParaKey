@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from keymuse_backend.config import BackendConfig
-from keymuse_backend.engine import (
+from parakey_backend.config import BackendConfig
+from parakey_backend.engine import (
     EngineEvent,
     InferenceEngine,
     MockInferenceEngine,

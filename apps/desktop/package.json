@@ -1,5 +1,5 @@
 {
-  "name": "keymuse-desktop",
+  "name": "parakey-desktop",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -53,8 +53,8 @@
     "wait-on": "^8.0.2"
   },
   "build": {
-    "appId": "com.keymuse.desktop",
-    "productName": "KeyMuse",
+    "appId": "com.parakey.desktop",
+    "productName": "ParaKey",
     "directories": {
       "output": "dist"
     },

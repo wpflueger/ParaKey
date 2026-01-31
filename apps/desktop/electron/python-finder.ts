@@ -113,7 +113,7 @@ export const ensureVenv = (pythonPath: string, venvRoot: string): string => {
 };
 
 const findEnvPython = (): string | null => {
-  const envPython = process.env.KEYMUSE_PYTHON;
+  const envPython = process.env.PARAKEY_PYTHON;
   if (envPython && fs.existsSync(envPython)) {
     return envPython;
   }
@@ -249,7 +249,7 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   }
 
   throw new PythonNotFoundError(
-    "Python 3.11+ not found. Install Python or set KEYMUSE_PYTHON to your Python executable.",
+    "Python 3.11+ not found. Install Python or set PARAKEY_PYTHON to your Python executable.",
   );
 };
 
