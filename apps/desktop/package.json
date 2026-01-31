@@ -86,9 +86,7 @@
     },
     "nsis": {
       "installerIcon": "public/icons/app.ico",
-      "uninstallerIcon": "public/icons/app.ico",
-      "installerHeader": "public/icons/installer-header-150x57.png",
-      "installerSidebar": "public/icons/installer-sidebar-164x314.png"
+      "uninstallerIcon": "public/icons/app.ico"
     }
   }
 }
