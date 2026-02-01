@@ -6,10 +6,10 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from keymuse_backend.config import BackendConfig
-from keymuse_backend.engine import MockInferenceEngine
-from keymuse_backend.service import DictationService
-from keymuse_proto import dictation_pb2
+from parakey_backend.config import BackendConfig
+from parakey_backend.engine import MockInferenceEngine
+from parakey_backend.service import DictationService
+from parakey_proto import dictation_pb2
 
 
 async def _audio_stream(

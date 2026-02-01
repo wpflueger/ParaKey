@@ -89,7 +89,7 @@ export type DictationClient = {
 export const createDictationClient = (host: string, port: number): DictationClient => {
   const methods = {
     StreamAudio: {
-      path: "/keymuse.dictation.v1.DictationService/StreamAudio",
+      path: "/parakey.dictation.v1.DictationService/StreamAudio",
       requestStream: true,
       responseStream: true,
       requestSerialize: serializeAudioFrame,
@@ -98,7 +98,7 @@ export const createDictationClient = (host: string, port: number): DictationClie
       responseDeserialize: deserializeDictationEvent,
     },
     GetHealth: {
-      path: "/keymuse.dictation.v1.DictationService/GetHealth",
+      path: "/parakey.dictation.v1.DictationService/GetHealth",
       requestStream: false,
       responseStream: false,
       requestSerialize: () => encodeJson({}),

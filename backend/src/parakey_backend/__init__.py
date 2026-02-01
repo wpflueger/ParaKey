@@ -1,13 +1,13 @@
-"""KeyMuse backend package."""
+"""ParaKey backend package."""
 
-from keymuse_backend.config import BackendConfig, load_config_from_env
-from keymuse_backend.engine import (
+from parakey_backend.config import BackendConfig, load_config_from_env
+from parakey_backend.engine import (
     EngineEvent,
     InferenceEngine,
     create_engine,
 )
-from keymuse_backend.server import BackendServer
-from keymuse_backend.service import DictationService
+from parakey_backend.server import BackendServer
+from parakey_backend.service import DictationService
 
 __version__ = "0.1.0"
 

@@ -28,7 +28,7 @@ const stubBridge = () => ({
 });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-(window as any).keymuse = stubBridge();
+(window as any).parakey = stubBridge();
 
 describe("App", () => {
   it("renders startup view without crashing", async () => {

@@ -1,4 +1,4 @@
-"""gRPC service implementation for KeyMuse dictation."""
+"""gRPC service implementation for ParaKey dictation."""
 
 from __future__ import annotations
 
@@ -9,12 +9,12 @@ from typing import AsyncIterator, Optional
 
 import grpc
 
-from keymuse_backend.config import BackendConfig
-from keymuse_backend.engine import (
+from parakey_backend.config import BackendConfig
+from parakey_backend.engine import (
     InferenceEngine,
     create_engine,
 )
-from keymuse_proto import dictation_pb2, dictation_pb2_grpc
+from parakey_proto import dictation_pb2, dictation_pb2_grpc
 
 logger = logging.getLogger(__name__)
 

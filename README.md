@@ -1,4 +1,4 @@
-# KeyMuse
+# ParaKey
 
 Speech-to-text dictation app for Windows. Press a hotkey, speak, release - text appears anywhere.
 
@@ -14,22 +14,22 @@ Speech-to-text dictation app for Windows. Press a hotkey, speak, release - text 
 
 ### Download & Install
 
-Download the latest release from the [Releases](https://github.com/yourusername/keymuse/releases) page and run the installer.
+Download the latest release from the [Releases](https://github.com/yourusername/parakey/releases) page and run the installer.
 
 ### First Run
 
-1. Launch KeyMuse
+1. Launch ParaKey
 2. Wait for the model to download (~2GB, one-time)
 3. Once ready, press **Ctrl+Alt** (default) to dictate
 4. Release to insert transcribed text
 
 ## Architecture
 
-KeyMuse uses a hybrid architecture with an Electron desktop app communicating with a Python backend for AI inference.
+ParaKey uses a hybrid architecture with an Electron desktop app communicating with a Python backend for AI inference.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        KeyMuse Desktop                          │
+│                        ParaKey Desktop                          │
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
 │  │   React UI      │    │  Electron Main  │    │   Python    │ │
@@ -139,7 +139,7 @@ flowchart TB
 ## Project Structure
 
 ```
-KeyMuse/
+ParaKey/
 ├── apps/
 │   └── desktop/              # Electron desktop application
 │       ├── electron/         # Main process code
@@ -153,7 +153,7 @@ KeyMuse/
 │       │   └── App.css       # Styles
 │       └── public/           # Static assets
 ├── backend/                  # Python speech recognition
-│   └── src/keymuse_backend/
+│   └── src/parakey_backend/
 │       ├── server.py         # gRPC server entry
 │       ├── service.py        # Dictation service
 │       ├── engine.py         # Inference orchestration
@@ -175,8 +175,8 @@ KeyMuse/
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/keymuse.git
-cd keymuse
+git clone https://github.com/yourusername/parakey.git
+cd parakey
 
 # Install Electron app dependencies
 cd apps/desktop
@@ -194,11 +194,11 @@ cd apps/desktop
 bun run dist
 ```
 
-Output: `apps/desktop/dist/KeyMuse Setup.exe`
+Output: `apps/desktop/dist/ParaKey Setup.exe`
 
 ## Configuration
 
-Settings are stored in `%APPDATA%/keymuse-desktop/settings.json`:
+Settings are stored in `%APPDATA%/parakey-desktop/settings.json`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -210,7 +210,7 @@ Settings are stored in `%APPDATA%/keymuse-desktop/settings.json`:
 ## Requirements
 
 - **OS:** Windows 10/11
-- **Python:** 3.11 or 3.12 (auto-detected or set `KEYMUSE_PYTHON`)
+- **Python:** 3.11 or 3.12 (auto-detected or set `PARAKEY_PYTHON`)
 - **GPU:** NVIDIA with CUDA support (RTX recommended)
 - **Disk:** ~3GB (model cache)
 - **RAM:** 8GB+ recommended
@@ -221,7 +221,7 @@ Settings are stored in `%APPDATA%/keymuse-desktop/settings.json`:
 Install Python 3.11+ from [python.org](https://python.org) or Microsoft Store.
 
 ### "Numpy is not available"
-Run: `%APPDATA%/keymuse-desktop/python/.venv/Scripts/python.exe -m pip install "numpy<2" --force-reinstall`
+Run: `%APPDATA%/parakey-desktop/python/.venv/Scripts/python.exe -m pip install "numpy<2" --force-reinstall`
 
 ### Transcription is slow
 Ensure CUDA is available. Check GPU usage in Task Manager during dictation.

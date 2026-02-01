@@ -1,4 +1,4 @@
-"""Backend configuration for KeyMuse ASR service."""
+"""Backend configuration for ParaKey ASR service."""
 
 from dataclasses import dataclass
 from typing import Optional
@@ -33,17 +33,17 @@ def load_config_from_env() -> BackendConfig:
     import os
 
     return BackendConfig(
-        host=os.getenv("KEYMUSE_HOST", "127.0.0.1"),
-        port=int(os.getenv("KEYMUSE_PORT", "50051")),
-        mode=os.getenv("KEYMUSE_MODE", "nemo"),
+        host=os.getenv("PARAKEY_HOST", "127.0.0.1"),
+        port=int(os.getenv("PARAKEY_PORT", "50051")),
+        mode=os.getenv("PARAKEY_MODE", "nemo"),
         model_name=os.getenv(
-            "KEYMUSE_MODEL", "nvidia/parakeet-tdt-0.6b-v3"
+            "PARAKEY_MODEL", "nvidia/parakeet-tdt-0.6b-v3"
         ),
-        device=os.getenv("KEYMUSE_DEVICE"),
+        device=os.getenv("PARAKEY_DEVICE"),
         partial_every_n_frames=int(
-            os.getenv("KEYMUSE_PARTIAL_INTERVAL", "10")
+            os.getenv("PARAKEY_PARTIAL_INTERVAL", "10")
         ),
-        sample_rate_hz=int(os.getenv("KEYMUSE_SAMPLE_RATE", "16000")),
+        sample_rate_hz=int(os.getenv("PARAKEY_SAMPLE_RATE", "16000")),
     )
 
 

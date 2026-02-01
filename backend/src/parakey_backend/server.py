@@ -1,4 +1,4 @@
-"""gRPC server entry point for KeyMuse backend."""
+"""gRPC server entry point for ParaKey backend."""
 
 from __future__ import annotations
 
@@ -9,15 +9,15 @@ from typing import Optional
 
 import grpc
 
-from keymuse_backend.config import BackendConfig, load_config_from_env
-from keymuse_backend.service import DictationService
-from keymuse_proto import dictation_pb2_grpc
+from parakey_backend.config import BackendConfig, load_config_from_env
+from parakey_backend.service import DictationService
+from parakey_proto import dictation_pb2_grpc
 
-logger = logging.getLogger("keymuse.backend")
+logger = logging.getLogger("parakey.backend")
 
 
 class BackendServer:
-    """KeyMuse backend gRPC server."""
+    """ParaKey backend gRPC server."""
 
     def __init__(self, config: Optional[BackendConfig] = None) -> None:
         """Initialize the backend server.
@@ -54,7 +54,7 @@ class BackendServer:
 
         This loads the model and starts the gRPC server.
         """
-        logger.info(f"Starting KeyMuse backend (mode: {self._config.mode})")
+        logger.info(f"Starting ParaKey backend (mode: {self._config.mode})")
 
         # Load the model
         logger.info("Loading model...")

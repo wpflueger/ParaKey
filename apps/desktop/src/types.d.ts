@@ -39,7 +39,7 @@ export type AppSettings = {
 
 declare global {
   interface Window {
-    keymuse: {
+    parakey: {
       onBackendLog: (callback: (line: string) => void) => () => void;
       onBackendStatus: (callback: (payload: BackendStatus) => void) => () => void;
       onDictationState: (callback: (payload: { state: DictationState }) => void) => () => void;

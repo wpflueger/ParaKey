@@ -18,8 +18,8 @@ const DEFAULT_SETTINGS: AppSettings = {
 const noop = () => () => {};
 
 export const getBridge = () => {
-  if (typeof window !== "undefined" && window.keymuse) {
-    return window.keymuse;
+  if (typeof window !== "undefined" && window.parakey) {
+    return window.parakey;
   }
 
   return {

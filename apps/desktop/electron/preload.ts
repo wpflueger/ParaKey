@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { AppSettings } from "./settings";
 
-contextBridge.exposeInMainWorld("keymuse", {
+contextBridge.exposeInMainWorld("parakey", {
   onBackendLog: (callback: (line: string) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, line: string) => callback(line);
     ipcRenderer.on("backend:log", handler);
