@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, screen } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Tray, screen } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
@@ -59,7 +59,9 @@ const getIconPath = () => {
 };
 
 const getTrayIconPath = () => {
-  const trayFile = "tray-32.png";
+  const trayFile = nativeTheme.shouldUseDarkColors
+    ? "Tray_32_light.png"
+    : "Tray_32_dark.png";
   return IS_DEV
     ? path.join(APP_ROOT, "public", "icons", trayFile)
     : path.join(RENDERER_DIST, "icons", trayFile);
@@ -192,6 +194,15 @@ const createTray = () => {
   tray.setToolTip("ParaKey - Press Ctrl+Alt to dictate");
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow?.show());
+
+  nativeTheme.on("updated", () => {
+    if (tray) {
+      const newIcon = nativeImage.createFromPath(getTrayIconPath());
+      if (!newIcon.isEmpty()) {
+        tray.setImage(newIcon);
+      }
+    }
+  });
 };
 
 const ensureBackend = async () => {
