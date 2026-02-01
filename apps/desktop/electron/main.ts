@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, Tray, screen } from "electron";
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, Tray, screen } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
@@ -28,6 +28,7 @@ import {
   RENDERER_DEV_URL,
   RENDERER_DIST,
 } from "./constants";
+import { autoUpdater } from "electron-updater";
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
@@ -59,7 +60,9 @@ const getIconPath = () => {
 };
 
 const getTrayIconPath = () => {
-  const trayFile = "tray-32.png";
+  const trayFile = nativeTheme.shouldUseDarkColors
+    ? "Tray_32_light.png"
+    : "Tray_32_dark.png";
   return IS_DEV
     ? path.join(APP_ROOT, "public", "icons", trayFile)
     : path.join(RENDERER_DIST, "icons", trayFile);
@@ -192,6 +195,17 @@ const createTray = () => {
   tray.setToolTip("ParaKey - Press Ctrl+Alt to dictate");
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow?.show());
+
+  const onThemeUpdated = () => {
+    if (tray) {
+      const newIcon = nativeImage.createFromPath(getTrayIconPath());
+      if (!newIcon.isEmpty()) {
+        tray.setImage(newIcon);
+      }
+    }
+  };
+  nativeTheme.on("updated", onThemeUpdated);
+  app.on("before-quit", () => nativeTheme.off("updated", onThemeUpdated));
 };
 
 const ensureBackend = async () => {
@@ -492,6 +506,21 @@ const startApp = async () => {
     },
     settings.hotkey.preset,
   );
+
+  if (app.isPackaged) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on("update-available", (info) => {
+      sendToMain("backend:log", `Update available: v${info.version}`);
+    });
+    autoUpdater.on("update-downloaded", (info) => {
+      sendToMain("backend:log", `Update v${info.version} downloaded. It will be installed on quit.`);
+    });
+    autoUpdater.on("error", (err) => {
+      sendToMain("backend:log", `Auto-update error: ${err.message}`);
+    });
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 };
 
 process.on("unhandledRejection", (reason) => {

@@ -14,5 +14,6 @@ export default defineConfig({
     "naudiodon",
     "uiohook-napi",
     "electron-rebuild",
+    "electron-updater",
   ],
 });
