@@ -196,14 +196,16 @@ const createTray = () => {
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow?.show());
 
-  nativeTheme.on("updated", () => {
+  const onThemeUpdated = () => {
     if (tray) {
       const newIcon = nativeImage.createFromPath(getTrayIconPath());
       if (!newIcon.isEmpty()) {
         tray.setImage(newIcon);
       }
     }
-  });
+  };
+  nativeTheme.on("updated", onThemeUpdated);
+  app.on("before-quit", () => nativeTheme.off("updated", onThemeUpdated));
 };
 
 const ensureBackend = async () => {
@@ -505,7 +507,7 @@ const startApp = async () => {
     settings.hotkey.preset,
   );
 
-  if (!IS_DEV) {
+  if (app.isPackaged) {
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = true;
     autoUpdater.on("update-available", (info) => {
