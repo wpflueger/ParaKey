@@ -28,6 +28,7 @@ import {
   RENDERER_DEV_URL,
   RENDERER_DIST,
 } from "./constants";
+import { autoUpdater } from "electron-updater";
 
 let mainWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
@@ -503,6 +504,21 @@ const startApp = async () => {
     },
     settings.hotkey.preset,
   );
+
+  if (!IS_DEV) {
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on("update-available", (info) => {
+      sendToMain("backend:log", `Update available: v${info.version}`);
+    });
+    autoUpdater.on("update-downloaded", (info) => {
+      sendToMain("backend:log", `Update v${info.version} downloaded. It will be installed on quit.`);
+    });
+    autoUpdater.on("error", (err) => {
+      sendToMain("backend:log", `Auto-update error: ${err.message}`);
+    });
+    autoUpdater.checkForUpdatesAndNotify();
+  }
 };
 
 process.on("unhandledRejection", (reason) => {
