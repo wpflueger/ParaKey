@@ -280,9 +280,12 @@ const ensureBackend = async () => {
 };
 
 const startBackendProcess = async () => {
-  const nativeDeps = await ensureNativeAudioDeps((line) => {
-    sendToMain("backend:log", line);
-  });
+  const [nativeDeps, python] = await Promise.all([
+    ensureNativeAudioDeps((line) => {
+      sendToMain("backend:log", line);
+    }),
+    ensureBackend(),
+  ]);
   if (!nativeDeps.ok) {
     sendToMain(
       "backend:log",
@@ -294,7 +297,6 @@ const startBackendProcess = async () => {
     );
   }
 
-  const python = await ensureBackend();
   sendToMain("backend:log", `Using Python: ${python.executable}`);
 
   const backend = startBackend(python, {
