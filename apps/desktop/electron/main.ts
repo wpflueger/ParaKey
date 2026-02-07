@@ -4,7 +4,7 @@ import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
 import { createAudioStream } from "./audio";
 import { ensureNativeAudioDeps } from "./native-deps";
-import { registerHoldHotkey, stopHotkeyListener } from "./hotkeys";
+import { registerHoldHotkey, setHotkeyPreset, stopHotkeyListener } from "./hotkeys";
 import { addTranscript, getHistory, getLastTranscript } from "./history";
 import { sanitizeText, setClipboardText, sendPaste } from "./clipboard";
 import { loadSettings, saveSettings } from "./settings";
@@ -462,8 +462,12 @@ const stopDictation = async () => {
 const wireIpc = () => {
   ipcMain.handle("settings:get", () => settings);
   ipcMain.handle("settings:save", (_event, next: AppSettings) => {
+    const prevPreset = settings.hotkey.preset;
     settings = next;
     saveSettings(settings);
+    if (next.hotkey.preset !== prevPreset) {
+      setHotkeyPreset(next.hotkey.preset);
+    }
     return true;
   });
   ipcMain.handle("history:get", () => getHistory());
