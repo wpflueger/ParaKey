@@ -38,20 +38,44 @@ const runPythonCheck = (pythonPath: string, code: string): string | null => {
   }
 };
 
-const checkPythonVersion = (pythonPath: string): string | null =>
-  runPythonCheck(pythonPath, "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')");
+type PythonCheckResult = {
+  version: string;
+  hasTorch: boolean;
+  hasNemo: boolean;
+  hasGrpc: boolean;
+  hasCuda: boolean;
+};
 
-const checkTorch = (pythonPath: string): boolean =>
-  runPythonCheck(pythonPath, "import torch; print('ok')") === "ok";
+const getAllPythonInfo = (pythonPath: string): PythonCheckResult | null => {
+  const script = [
+    "import sys, json",
+    "info = {'version': f'{sys.version_info.major}.{sys.version_info.minor}', 'hasTorch': False, 'hasNemo': False, 'hasGrpc': False, 'hasCuda': False}",
+    "try:",
+    "    import torch; info['hasTorch'] = True; info['hasCuda'] = torch.cuda.is_available()",
+    "except Exception: pass",
+    "try:",
+    "    import nemo; info['hasNemo'] = True",
+    "except Exception: pass",
+    "try:",
+    "    import grpc; info['hasGrpc'] = True",
+    "except Exception: pass",
+    "print(json.dumps(info))",
+  ].join("\n");
 
-const checkNemo = (pythonPath: string): boolean =>
-  runPythonCheck(pythonPath, "import nemo; print('ok')") === "ok";
-
-const checkGrpc = (pythonPath: string): boolean =>
-  runPythonCheck(pythonPath, "import grpc; print('ok')") === "ok";
-
-const checkCuda = (pythonPath: string): boolean =>
-  runPythonCheck(pythonPath, "import torch; print('ok' if torch.cuda.is_available() else 'no')") === "ok";
+  try {
+    const result = spawnSync(pythonPath, ["-c", script], {
+      encoding: "utf-8",
+      timeout: 30000,
+      windowsHide: true,
+    });
+    if (result.status === 0) {
+      return JSON.parse(result.stdout.trim()) as PythonCheckResult;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 const isValidPython = (version: string | null): boolean => {
   if (!version) {
@@ -68,29 +92,36 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
   if (!fs.existsSync(pythonPath)) {
     return null;
   }
-  const version = checkPythonVersion(pythonPath);
-  if (!isValidPython(version)) {
+
+  if (!checkDeps) {
+    // Quick check: just version
+    const version = runPythonCheck(pythonPath, "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')");
+    if (!isValidPython(version)) {
+      return null;
+    }
+    return {
+      executable: pythonPath,
+      version: version ?? "",
+      hasTorch: false,
+      hasNemo: false,
+      hasGrpc: false,
+      hasCuda: false,
+    };
+  }
+
+  // Full check: version + all deps in one call
+  const result = getAllPythonInfo(pythonPath);
+  if (!result || !isValidPython(result.version)) {
     return null;
   }
-  const info: PythonInfo = {
+  return {
     executable: pythonPath,
-    version: version ?? "",
-    hasTorch: false,
-    hasNemo: false,
-    hasGrpc: false,
-    hasCuda: false,
+    version: result.version,
+    hasTorch: result.hasTorch,
+    hasNemo: result.hasNemo,
+    hasGrpc: result.hasGrpc,
+    hasCuda: result.hasCuda,
   };
-
-  if (checkDeps) {
-    info.hasTorch = checkTorch(pythonPath);
-    info.hasNemo = checkNemo(pythonPath);
-    info.hasGrpc = checkGrpc(pythonPath);
-    if (info.hasTorch) {
-      info.hasCuda = checkCuda(pythonPath);
-    }
-  }
-
-  return info;
 };
 
 export const getPythonInfoForExecutable = (
