@@ -312,7 +312,7 @@ function App() {
                     <option value="win+alt">Win + Alt</option>
                   </select>
                 </label>
-                <p className="subtle">Hold the shortcut to record, release to transcribe. Restart required to apply.</p>
+                <p className="subtle">Hold the shortcut to record, release to transcribe.</p>
               </section>
               <section>
                 <h3>Overlay</h3>
