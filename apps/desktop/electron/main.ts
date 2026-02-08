@@ -40,6 +40,7 @@ let audioController: Awaited<ReturnType<typeof createAudioStream>> | null = null
 let dictationStream: ReturnType<typeof streamAudio> | null = null;
 let dictationActive = false;
 let isQuitting = false;
+let overlayHideTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Safely send IPC message to main window (handles destroyed window)
 const sendToMain = (channel: string, ...args: unknown[]) => {
@@ -144,11 +145,20 @@ const showOverlay = (text: string, mode: "listening" | "processing" | "inserted"
   if (!settings.overlay.enabled || !overlayWindow) {
     return;
   }
+  if (overlayHideTimer) {
+    clearTimeout(overlayHideTimer);
+    overlayHideTimer = null;
+  }
   positionOverlay(settings.overlay.position);
   overlayWindow.showInactive();
   overlayWindow.webContents.send("overlay:update", { text, mode });
   if (mode !== "listening" && settings.overlay.autoHideMs > 0) {
-    setTimeout(() => overlayWindow?.hide(), settings.overlay.autoHideMs);
+    overlayHideTimer = setTimeout(() => {
+      overlayHideTimer = null;
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.hide();
+      }
+    }, settings.overlay.autoHideMs);
   }
 };
 
