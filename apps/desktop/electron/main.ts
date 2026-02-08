@@ -290,10 +290,19 @@ const ensureBackend = async () => {
 };
 
 const startBackendProcess = async () => {
-  const nativeDeps = await ensureNativeAudioDeps((line) => {
-    sendToMain("backend:log", line);
-  });
-  if (!nativeDeps.ok) {
+  const [nativeDepsResult, pythonResult] = await Promise.allSettled([
+    ensureNativeAudioDeps((line) => {
+      sendToMain("backend:log", line);
+    }),
+    ensureBackend(),
+  ]);
+
+  if (pythonResult.status === "rejected") {
+    throw pythonResult.reason;
+  }
+  const python = pythonResult.value;
+
+  if (nativeDepsResult.status === "rejected" || !nativeDepsResult.value.ok) {
     sendToMain(
       "backend:log",
       "Audio capture will be unavailable until native modules rebuild successfully.",
@@ -304,7 +313,6 @@ const startBackendProcess = async () => {
     );
   }
 
-  const python = await ensureBackend();
   sendToMain("backend:log", `Using Python: ${python.executable}`);
 
   const backend = startBackend(python, {
