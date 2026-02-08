@@ -52,22 +52,22 @@ class BackendServer:
     async def start(self) -> None:
         """Start the backend server.
 
-        This loads the model and starts the gRPC server.
+        Starts the gRPC server first so clients can connect and check health,
+        then loads the model. GetHealth returns ready=false until loading completes.
         """
         logger.info(f"Starting ParaKey backend (mode: {self._config.mode})")
 
-        # Load the model
-        logger.info("Loading model...")
-        self._service.load_model()
-        logger.info(f"Model loaded on {self._service.engine.device}")
-
-        # Create and start the server
+        # Start gRPC server first so health checks work during model loading
         self._server = self._create_server()
         await self._server.start()
-
         logger.info(
             f"Backend listening on {self._config.host}:{self._config.port}"
         )
+
+        # Load the model in a thread so gRPC can serve health checks during loading
+        logger.info("Loading model...")
+        await asyncio.to_thread(self._service.load_model)
+        logger.info(f"Model loaded on {self._service.engine.device}")
 
     async def stop(self) -> None:
         """Stop the backend server gracefully."""
@@ -140,11 +140,15 @@ def create_server(config: BackendConfig) -> grpc.aio.Server:
         Configured gRPC server.
     """
     service = DictationService(config)
-    service.load_model()
 
     server = grpc.aio.server()
     dictation_pb2_grpc.add_DictationServiceServicer_to_server(service, server)
     server.add_insecure_port(f"{config.host}:{config.port}")
+
+    # Note: load_model() blocks synchronously; callers must start the server
+    # separately if they need health checks to be available during loading.
+    service.load_model()
+
     return server
 
 
