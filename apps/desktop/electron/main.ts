@@ -4,7 +4,7 @@ import path from "node:path";
 import { createDictationClient, streamAudio } from "./grpc-client";
 import { createAudioStream } from "./audio";
 import { ensureNativeAudioDeps } from "./native-deps";
-import { registerHoldHotkey, setHotkeyPreset, stopHotkeyListener } from "./hotkeys";
+import { registerHoldHotkey, stopHotkeyListener } from "./hotkeys";
 import { addTranscript, getHistory, getLastTranscript } from "./history";
 import { sanitizeText, setClipboardText, sendPaste } from "./clipboard";
 import { loadSettings, saveSettings } from "./settings";
@@ -466,7 +466,11 @@ const wireIpc = () => {
     settings = next;
     saveSettings(settings);
     if (next.hotkey.preset !== prevPreset) {
-      setHotkeyPreset(next.hotkey.preset);
+      stopHotkeyListener();
+      registerHoldHotkey(
+        { onActivate: startDictation, onDeactivate: stopDictation },
+        next.hotkey.preset,
+      );
     }
     return true;
   });
