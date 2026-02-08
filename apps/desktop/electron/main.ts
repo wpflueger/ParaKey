@@ -153,7 +153,12 @@ const showOverlay = (text: string, mode: "listening" | "processing" | "inserted"
   overlayWindow.showInactive();
   overlayWindow.webContents.send("overlay:update", { text, mode });
   if (mode !== "listening" && settings.overlay.autoHideMs > 0) {
-    overlayHideTimer = setTimeout(() => overlayWindow?.hide(), settings.overlay.autoHideMs);
+    overlayHideTimer = setTimeout(() => {
+      overlayHideTimer = null;
+      if (overlayWindow && !overlayWindow.isDestroyed()) {
+        overlayWindow.hide();
+      }
+    }, settings.overlay.autoHideMs);
   }
 };
 
