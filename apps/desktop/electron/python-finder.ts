@@ -51,8 +51,14 @@ const getAllPythonInfo = (pythonPath: string): PythonCheckResult | null => {
     "import sys, json",
     "info = {'version': f'{sys.version_info.major}.{sys.version_info.minor}', 'hasTorch': False, 'hasNemo': False, 'hasGrpc': False, 'hasCuda': False}",
     "try:",
-    "    import torch; info['hasTorch'] = True; info['hasCuda'] = torch.cuda.is_available()",
-    "except Exception: pass",
+    "    import torch",
+    "    info['hasTorch'] = True",
+    "    try:",
+    "        info['hasCuda'] = torch.cuda.is_available()",
+    "    except Exception:",
+    "        pass",
+    "except Exception:",
+    "    pass",
     "try:",
     "    import nemo; info['hasNemo'] = True",
     "except Exception: pass",
@@ -62,16 +68,12 @@ const getAllPythonInfo = (pythonPath: string): PythonCheckResult | null => {
     "print(json.dumps(info))",
   ].join("\n");
 
-  try {
-    const result = spawnSync(pythonPath, ["-c", script], {
-      encoding: "utf-8",
-      timeout: 30000,
-      windowsHide: true,
-    });
-    if (result.status === 0) {
-      return JSON.parse(result.stdout.trim()) as PythonCheckResult;
-    }
+  const output = runPythonCheck(pythonPath, script);
+  if (!output) {
     return null;
+  }
+  try {
+    return JSON.parse(output) as PythonCheckResult;
   } catch {
     return null;
   }
