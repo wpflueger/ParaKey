@@ -64,9 +64,9 @@ class BackendServer:
             f"Backend listening on {self._config.host}:{self._config.port}"
         )
 
-        # Load the model (health check returns ready=false until done)
+        # Load the model in a thread so gRPC can serve health checks during loading
         logger.info("Loading model...")
-        self._service.load_model()
+        await asyncio.to_thread(self._service.load_model)
         logger.info(f"Model loaded on {self._service.engine.device}")
 
     async def stop(self) -> None:
@@ -145,7 +145,8 @@ def create_server(config: BackendConfig) -> grpc.aio.Server:
     dictation_pb2_grpc.add_DictationServiceServicer_to_server(service, server)
     server.add_insecure_port(f"{config.host}:{config.port}")
 
-    # Load model after server creation so health checks can connect immediately
+    # Note: load_model() blocks synchronously; callers must start the server
+    # separately if they need health checks to be available during loading.
     service.load_model()
 
     return server
