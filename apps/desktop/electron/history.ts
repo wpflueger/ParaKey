@@ -4,7 +4,8 @@ import path from "node:path";
 
 const MAX_HISTORY = 10;
 
-let history: string[] | null = null;
+let history: string[] = [];
+let loaded = false;
 
 const getHistoryPath = (): string =>
   path.join(app.getPath("userData"), "history.json");
@@ -17,7 +18,7 @@ const loadHistory = (): string[] => {
       Array.isArray(parsed) &&
       parsed.every((item) => typeof item === "string")
     ) {
-      return (parsed as string[]).slice(-MAX_HISTORY);
+      return parsed.slice(-MAX_HISTORY);
     }
     return [];
   } catch {
@@ -30,37 +31,39 @@ const persistHistory = (): void => {
     const filePath = getHistoryPath();
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     fs.writeFileSync(filePath, JSON.stringify(history), "utf-8");
-  } catch {
-    // Silently ignore write errors
+  } catch (error) {
+    console.warn("Failed to persist history:", error);
   }
 };
 
 const ensureLoaded = (): void => {
-  if (history === null) {
+  if (!loaded) {
     history = loadHistory();
+    loaded = true;
   }
 };
 
 export const addTranscript = (text: string): void => {
   ensureLoaded();
-  history = [...(history as string[]), text].slice(-MAX_HISTORY);
+  history = [...history, text].slice(-MAX_HISTORY);
   persistHistory();
 };
 
 export const getHistory = (): string[] => {
   ensureLoaded();
-  return [...(history as string[])];
+  return [...history];
 };
 
 export const getLastTranscript = (): string | null => {
   ensureLoaded();
-  if ((history as string[]).length === 0) {
+  if (history.length === 0) {
     return null;
   }
-  return (history as string[])[(history as string[]).length - 1];
+  return history[history.length - 1];
 };
 
 export const clearHistory = (): void => {
   history = [];
+  loaded = true;
   persistHistory();
 };
