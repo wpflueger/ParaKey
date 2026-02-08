@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import AsyncIterable
 from typing import AsyncIterator, Optional
@@ -96,8 +95,6 @@ class DictationService(dictation_pb2_grpc.DictationServiceServicer):
         )
 
         for event in events:
-            await asyncio.sleep(0.01)  # Small delay between events
-
             if event.kind == "partial":
                 yield dictation_pb2.DictationEvent(
                     partial=dictation_pb2.TranscriptPartial(

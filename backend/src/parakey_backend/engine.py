@@ -133,7 +133,7 @@ class InferenceEngine:
         """Process a stream of audio frames and generate events.
 
         This concatenates all audio frames and performs a single
-        transcription, generating partial events during processing
+        transcription, generating a status event before processing
         and a final event with the result.
 
         Args:
@@ -145,24 +145,14 @@ class InferenceEngine:
         """
         events: list[EngineEvent] = []
 
-        # Generate periodic partial events while processing
-        partial_interval = self._config.partial_every_n_frames
-        for i, _ in enumerate(audio_frames, start=1):
-            if i % partial_interval == 0:
-                events.append(
-                    EngineEvent(
-                        kind="partial",
-                        text="Processing...",
-                        stability=0.3,
-                    )
-                )
-
         # Concatenate all audio frames
         audio_data = b"".join(audio_frames)
 
         if len(audio_data) == 0:
             events.append(EngineEvent(kind="final", text=""))
             return events
+
+        events.append(EngineEvent(kind="status", text="Transcribing..."))
 
         try:
             # Perform transcription
