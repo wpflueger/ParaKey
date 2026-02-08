@@ -19,8 +19,7 @@ class BackendConfig:
     model_name: str = "nvidia/parakeet-tdt-0.6b-v3"
     device: Optional[str] = None  # None = auto-detect (GPU if available)
 
-    # Streaming settings
-    partial_every_n_frames: int = 10
+    # Audio settings
     sample_rate_hz: int = 16000
 
 
@@ -40,9 +39,6 @@ def load_config_from_env() -> BackendConfig:
             "PARAKEY_MODEL", "nvidia/parakeet-tdt-0.6b-v3"
         ),
         device=os.getenv("PARAKEY_DEVICE"),
-        partial_every_n_frames=int(
-            os.getenv("PARAKEY_PARTIAL_INTERVAL", "10")
-        ),
         sample_rate_hz=int(os.getenv("PARAKEY_SAMPLE_RATE", "16000")),
     )
 
