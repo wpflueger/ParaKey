@@ -66,6 +66,7 @@ class DictationService(dictation_pb2_grpc.DictationServiceServicer):
         sample_rate: int = self._config.sample_rate_hz
 
         # Collect audio frames
+        max_frames = self._config.max_audio_frames
         try:
             async for frame in request_iterator:
                 audio_frames.append(frame.audio)
@@ -75,6 +76,13 @@ class DictationService(dictation_pb2_grpc.DictationServiceServicer):
                     sample_rate = frame.sample_rate_hz
 
                 if frame.end_of_stream:
+                    break
+
+                if len(audio_frames) >= max_frames:
+                    logger.warning(
+                        f"Max audio frames ({max_frames}) reached, "
+                        "stopping collection"
+                    )
                     break
 
         except grpc.aio.AioRpcError as e:
