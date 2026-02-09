@@ -52,15 +52,16 @@ export const createAudioStream = async (
 
   let sequence = BigInt(0);
   let onFrame: ((frame: AudioFrame) => void) | null = null;
-  let buffer = Buffer.alloc(0);
+  // Remainder buffer holds only the leftover bytes (< one frame) after
+  // extracting complete frames. This is always small, avoiding the O(n^2)
+  // cost of concatenating the entire accumulated buffer on every chunk.
+  let remainder = Buffer.alloc(0);
 
   const flushBuffer = () => {
     // Send any remaining audio data, padding with silence if needed
-    if (buffer.length > 0 && onFrame) {
-      // Pad the remaining buffer with silence to make a complete frame
+    if (remainder.length > 0 && onFrame) {
       const paddedFrame = Buffer.alloc(frameBytes);
-      buffer.copy(paddedFrame, 0, 0, buffer.length);
-      // Rest of paddedFrame is already zeros (silence)
+      remainder.copy(paddedFrame, 0, 0, remainder.length);
       onFrame({
         audio: paddedFrame,
         sample_rate_hz: options.sampleRateHz,
@@ -68,15 +69,18 @@ export const createAudioStream = async (
         sequence: sequence++,
         end_of_stream: false,
       });
-      buffer = Buffer.alloc(0);
+      remainder = Buffer.alloc(0);
     }
   };
 
   input.on("data", (chunk: Buffer) => {
-    buffer = Buffer.concat([buffer, chunk]);
-    while (buffer.length >= frameBytes) {
-      const frame = buffer.subarray(0, frameBytes);
-      buffer = buffer.subarray(frameBytes);
+    // Only concat if there are leftover bytes from the previous chunk.
+    // The remainder is always < frameBytes, so this concat is bounded.
+    const data = remainder.length > 0 ? Buffer.concat([remainder, chunk]) : chunk;
+    let offset = 0;
+    while (offset + frameBytes <= data.length) {
+      const frame = data.subarray(offset, offset + frameBytes);
+      offset += frameBytes;
       if (onFrame) {
         onFrame({
           audio: frame,
@@ -87,6 +91,8 @@ export const createAudioStream = async (
         });
       }
     }
+    // Keep only the leftover bytes (always < frameBytes)
+    remainder = offset < data.length ? data.subarray(offset) : Buffer.alloc(0);
   });
 
   return {
