@@ -223,8 +223,8 @@ function App() {
       <section className="status-grid">
         <div className="status-card">
           <p className="label">Model</p>
-          <p className="value">Ready</p>
-          <span className="pill">Loaded</span>
+          <p className="value">{status.ready ? "Ready" : "Not Ready"}</p>
+          <span className={status.ready ? "pill" : "pill muted"}>{status.ready ? "Loaded" : "Unavailable"}</span>
         </div>
         <div className="status-card">
           <p className="label">Backend</p>
