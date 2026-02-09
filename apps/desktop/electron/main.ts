@@ -18,7 +18,7 @@ import {
   getPythonInfoForExecutable,
   resolveVenvPython,
 } from "./python-finder";
-import { startBackend } from "./backend";
+import { cleanupOrphanedBackend, startBackend } from "./backend";
 import {
   APP_ROOT,
   BACKEND_ROOT,
@@ -290,6 +290,8 @@ const ensureBackend = async () => {
 };
 
 const startBackendProcess = async () => {
+  cleanupOrphanedBackend();
+
   const [nativeDepsResult, pythonResult] = await Promise.allSettled([
     ensureNativeAudioDeps((line) => {
       sendToMain("backend:log", line);
