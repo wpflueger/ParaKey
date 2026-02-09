@@ -183,6 +183,9 @@ class ModelLoader:
             self._model = self._model.to(self._device)
             self._model.eval()
 
+            # Warmup inference to pre-compile CUDA kernels
+            self._warmup()
+
             self._loaded = True
             logger.info(f"Model loaded successfully on {self._device}")
 
@@ -192,6 +195,23 @@ class ModelLoader:
             ) from e
         except Exception as e:
             raise ModelLoadError(f"Failed to load model: {e}") from e
+
+    def _warmup(self) -> None:
+        """Run a short dummy transcription to warm up CUDA kernels."""
+        if self._model is None:
+            return
+
+        import numpy as np
+
+        try:
+            logger.info("Running CUDA warmup inference...")
+            warmup_audio = np.zeros(self._model.cfg.sample_rate, dtype="float32")
+            warmup_tensor = torch.from_numpy(warmup_audio).float()
+            with torch.no_grad():
+                self._model.transcribe(audio=[warmup_tensor])
+            logger.info("CUDA warmup complete")
+        except Exception as e:
+            logger.warning(f"CUDA warmup failed (non-fatal): {e}")
 
     def unload(self) -> None:
         """Unload the model and free memory."""
