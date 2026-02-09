@@ -1,8 +1,48 @@
 import { spawn } from "node:child_process";
+import fs from "node:fs";
 import path from "node:path";
+import { app } from "electron";
 import { BackendDepsError } from "./python-finder";
 import type { PythonInfo } from "./python-finder";
 import { BACKEND_ROOT, SHARED_ROOT } from "./constants";
+
+const getPidFilePath = (): string => path.join(app.getPath("userData"), "backend.pid");
+
+const writePidFile = (pid: number): void => {
+  fs.writeFileSync(getPidFilePath(), String(pid), "utf-8");
+};
+
+const removePidFile = (): void => {
+  try {
+    fs.unlinkSync(getPidFilePath());
+  } catch {
+    // File may not exist
+  }
+};
+
+/**
+ * Kill any orphaned backend process from a previous non-graceful exit.
+ * Reads the PID file and sends SIGTERM if the process is still alive.
+ */
+export const cleanupOrphanedBackend = (): void => {
+  const pidFile = getPidFilePath();
+  if (!fs.existsSync(pidFile)) {
+    return;
+  }
+  try {
+    const pid = parseInt(fs.readFileSync(pidFile, "utf-8").trim(), 10);
+    if (!Number.isNaN(pid)) {
+      // Check if process is still alive
+      process.kill(pid, 0);
+      // If we get here, process exists — kill it
+      console.log(`Killing orphaned backend process (PID ${pid})`);
+      process.kill(pid, "SIGTERM");
+    }
+  } catch {
+    // Process doesn't exist or we can't kill it — either way, clean up
+  }
+  removePidFile();
+};
 
 export type BackendStartOptions = {
   host: string;
@@ -70,6 +110,12 @@ export const startBackend = (
 
   child.stdout?.on("data", handleOutput);
   child.stderr?.on("data", handleOutput);
+
+  // Track the PID so orphaned processes can be cleaned up on next launch
+  if (child.pid != null) {
+    writePidFile(child.pid);
+  }
+  child.on("exit", () => removePidFile());
 
   return {
     process: child,
