@@ -24,6 +24,7 @@ export type AudioSettings = {
   sampleRateHz: number;
   channels: number;
   frameMs: number;
+  maxDurationSeconds: number;
 };
 
 export type BackendSettings = {
@@ -62,6 +63,7 @@ const DEFAULT_SETTINGS: AppSettings = {
     sampleRateHz: 16000,
     channels: 1,
     frameMs: 20,
+    maxDurationSeconds: 60,
   },
   backend: {
     host: "127.0.0.1",

@@ -41,6 +41,7 @@ let dictationStream: ReturnType<typeof streamAudio> | null = null;
 let dictationActive = false;
 let isQuitting = false;
 let overlayHideTimer: ReturnType<typeof setTimeout> | null = null;
+let maxDurationTimer: ReturnType<typeof setTimeout> | null = null;
 
 // Safely send IPC message to main window (handles destroyed window)
 const sendToMain = (channel: string, ...args: unknown[]) => {
@@ -425,6 +426,19 @@ const startDictation = async () => {
     dictationStream?.write(frame);
   });
   audioController.start();
+
+  // Auto-stop dictation after max duration to prevent CUDA OOM
+  const maxSeconds = settings.audio.maxDurationSeconds;
+  if (maxSeconds > 0) {
+    maxDurationTimer = setTimeout(() => {
+      maxDurationTimer = null;
+      if (dictationActive) {
+        showOverlay("Maximum duration reached.", "processing");
+        sendToMain("backend:log", `Max dictation duration (${maxSeconds}s) reached, stopping.`);
+        stopDictation();
+      }
+    }, maxSeconds * 1000);
+  }
 };
 
 const stopDictation = async () => {
@@ -432,6 +446,10 @@ const stopDictation = async () => {
     return;
   }
   dictationActive = false;
+  if (maxDurationTimer) {
+    clearTimeout(maxDurationTimer);
+    maxDurationTimer = null;
+  }
   sendToMain("dictation:state", { state: "PROCESSING" });
   showOverlay("Processing...", "processing");
 

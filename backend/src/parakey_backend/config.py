@@ -21,6 +21,7 @@ class BackendConfig:
 
     # Audio settings
     sample_rate_hz: int = 16000
+    max_audio_frames: int = 5000  # Safety limit (~100s at 20ms/frame)
 
 
 def load_config_from_env() -> BackendConfig:
