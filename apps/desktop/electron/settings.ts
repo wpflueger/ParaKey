@@ -42,11 +42,17 @@ export type OverlaySettings = {
   autoHideMs: number;
 };
 
+export type PasteSettings = {
+  focusDelayMs: number;
+  restoreDelayMs: number;
+};
+
 export type AppSettings = {
   hotkey: HotkeySettings;
   audio: AudioSettings;
   backend: BackendSettings;
   overlay: OverlaySettings;
+  paste: PasteSettings;
   startMinimized: boolean;
   showNotifications: boolean;
 };
@@ -78,6 +84,10 @@ const DEFAULT_SETTINGS: AppSettings = {
     yOffset: 20,
     autoHideMs: 2000,
   },
+  paste: {
+    focusDelayMs: 50,
+    restoreDelayMs: 100,
+  },
   startMinimized: true,
   showNotifications: true,
 };
@@ -101,6 +111,7 @@ export const loadSettings = (): AppSettings => {
       audio: { ...DEFAULT_SETTINGS.audio, ...parsed.audio },
       backend: { ...DEFAULT_SETTINGS.backend, ...parsed.backend },
       overlay: { ...DEFAULT_SETTINGS.overlay, ...parsed.overlay },
+      paste: { ...DEFAULT_SETTINGS.paste, ...parsed.paste },
     };
   } catch (error) {
     console.warn("Failed to load settings, using defaults", error);

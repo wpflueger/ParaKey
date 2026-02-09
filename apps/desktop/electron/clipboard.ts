@@ -25,20 +25,29 @@ export const setClipboardText = (text: string): void => {
 
 export const getClipboardText = (): string => clipboard.readText();
 
-export const sendPaste = (): void => {
-  // Small delay to ensure clipboard is ready and focus is restored
-  setTimeout(() => {
-    // Simulate Ctrl+V keystroke
-    uIOhook.keyTap(UiohookKey.V, [UiohookKey.Ctrl]);
-    // Restore previous clipboard content after paste
-    setTimeout(() => {
-      if (previousClipboardText !== null) {
-        clipboard.writeText(previousClipboardText);
-        previousClipboardText = null;
-      } else {
-        clipboard.clear();
-      }
-    }, 100);
-  }, 50);
+export type PasteTimingOptions = {
+  focusDelayMs?: number;
+  restoreDelayMs?: number;
+};
+
+const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+export const sendPaste = async (options: PasteTimingOptions = {}): Promise<void> => {
+  const { focusDelayMs = 50, restoreDelayMs = 100 } = options;
+
+  // Wait for clipboard to be ready and focus to be restored
+  await delay(focusDelayMs);
+
+  // Simulate Ctrl+V keystroke
+  uIOhook.keyTap(UiohookKey.V, [UiohookKey.Ctrl]);
+
+  // Restore previous clipboard content after paste
+  await delay(restoreDelayMs);
+  if (previousClipboardText !== null) {
+    clipboard.writeText(previousClipboardText);
+    previousClipboardText = null;
+  } else {
+    clipboard.clear();
+  }
 };
 

@@ -392,7 +392,7 @@ const startDictation = async () => {
         addTranscript(sanitized);
         sendToMain("dictation:final", { text: sanitized });
         setClipboardText(sanitized);
-        sendPaste();
+        sendPaste(settings.paste);
         showOverlay(`Inserted: ${sanitized.slice(0, 30)}`, "inserted");
       }
       if (event.error) {
