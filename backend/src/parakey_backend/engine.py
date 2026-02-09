@@ -192,7 +192,71 @@ class InferenceEngine:
         return events
 
 
-def create_engine(config: BackendConfig) -> InferenceEngine:
+class MockInferenceEngine:
+    """Mock inference engine for testing without a real model."""
+
+    def __init__(self, config: BackendConfig) -> None:
+        self._config = config
+        self._loaded = False
+
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
+    @property
+    def device(self) -> str:
+        return "mock"
+
+    def load_model(self) -> None:
+        self._loaded = True
+
+    def unload_model(self) -> None:
+        self._loaded = False
+
+    async def transcribe(
+        self,
+        audio_data: bytes,
+        sample_rate: int = 16000,
+    ) -> str:
+        if not self._loaded:
+            raise RuntimeError("Model not loaded")
+        return self._config.final_text
+
+    async def process_audio_stream(
+        self,
+        audio_frames: list[bytes],
+        sample_rate: int = 16000,
+    ) -> list[EngineEvent]:
+        return generate_mock_events(self._config, audio_frames)
+
+
+def generate_mock_events(
+    config: BackendConfig,
+    audio_frames: list[bytes],
+) -> list[EngineEvent]:
+    """Generate mock engine events for testing.
+
+    Args:
+        config: Backend configuration with partial_every_n_frames and final_text.
+        audio_frames: List of audio frame bytes.
+
+    Returns:
+        List of mock engine events.
+    """
+    events: list[EngineEvent] = []
+    n = config.partial_every_n_frames
+
+    for i, _ in enumerate(audio_frames, start=1):
+        if n > 0 and i % n == 0:
+            events.append(
+                EngineEvent(kind="partial", text=f"Partial {i // n}...", stability=0.5)
+            )
+
+    events.append(EngineEvent(kind="final", text=config.final_text))
+    return events
+
+
+def create_engine(config: BackendConfig) -> InferenceEngine | MockInferenceEngine:
     """Create an inference engine based on configuration.
 
     Args:
@@ -201,11 +265,15 @@ def create_engine(config: BackendConfig) -> InferenceEngine:
     Returns:
         An inference engine instance.
     """
+    if config.mode == "mock":
+        return MockInferenceEngine(config)
     return InferenceEngine(config)
 
 
 __all__ = [
     "EngineEvent",
     "InferenceEngine",
+    "MockInferenceEngine",
     "create_engine",
+    "generate_mock_events",
 ]

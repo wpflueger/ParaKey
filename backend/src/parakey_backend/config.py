@@ -23,6 +23,10 @@ class BackendConfig:
     sample_rate_hz: int = 16000
     max_audio_frames: int = 5000  # Safety limit (~100s at 20ms/frame)
 
+    # Mock engine settings (used in tests)
+    partial_every_n_frames: int = 10
+    final_text: str = "Mock transcription result"
+
 
 def load_config_from_env() -> BackendConfig:
     """Load configuration from environment variables.
