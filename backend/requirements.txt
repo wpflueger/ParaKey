@@ -1,6 +1,6 @@
 --extra-index-url https://download.pytorch.org/whl/cu121
 grpcio>=1.60.0
-torch==2.4.0+cu121
+torch==2.8.0
 nemo-toolkit[asr]>=2.0.0
 sentencepiece>=0.1.99
 numpy>=1.26.0,<2
