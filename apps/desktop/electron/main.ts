@@ -54,10 +54,10 @@ const sendToMain = (channel: string, ...args: unknown[]) => {
 };
 
 const getIconPath = () => {
-  // In dev, icon is in public folder; in production, it's in dist (renderer output)
+  const iconFile = process.platform === "darwin" ? "app_32.png" : "app.ico";
   return IS_DEV
-    ? path.join(APP_ROOT, "public", "icons", "app.ico")
-    : path.join(RENDERER_DIST, "icons", "app.ico");
+    ? path.join(APP_ROOT, "public", "icons", iconFile)
+    : path.join(RENDERER_DIST, "icons", iconFile);
 };
 
 const getTrayIconPath = () => {
@@ -202,7 +202,7 @@ const createTray = () => {
       click: () => app.quit(),
     },
   ]);
-  tray.setToolTip("ParaKey - Press Ctrl+Alt to dictate");
+  tray.setToolTip("ParaKey - Hold hotkey to dictate");
   tray.setContextMenu(contextMenu);
   tray.on("double-click", () => mainWindow?.show());
 
@@ -514,7 +514,9 @@ const waitForRenderer = (): Promise<void> =>
   });
 
 const startApp = async () => {
-  Menu.setApplicationMenu(null);
+  if (process.platform !== "darwin") {
+    Menu.setApplicationMenu(null);
+  }
   createMainWindow();
   createOverlayWindow();
   createTray();
@@ -557,7 +559,14 @@ process.on("unhandledRejection", (reason) => {
 app.whenReady().then(startApp);
 
 app.on("window-all-closed", () => {
-  // Keep the app running in the tray on Windows.
+  // Keep running in the tray/dock on all platforms.
+});
+
+app.on("activate", () => {
+  // macOS: re-show the window when clicking the dock icon.
+  if (mainWindow) {
+    mainWindow.show();
+  }
 });
 
 app.on("before-quit", () => {

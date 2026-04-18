@@ -9,6 +9,7 @@ export type PythonInfo = {
   hasNemo: boolean;
   hasGrpc: boolean;
   hasCuda: boolean;
+  hasMlx: boolean;
 };
 
 export class PythonNotFoundError extends Error {}
@@ -44,12 +45,13 @@ type PythonCheckResult = {
   hasNemo: boolean;
   hasGrpc: boolean;
   hasCuda: boolean;
+  hasMlx: boolean;
 };
 
 const getAllPythonInfo = (pythonPath: string): PythonCheckResult | null => {
   const script = [
     "import sys, json",
-    "info = {'version': f'{sys.version_info.major}.{sys.version_info.minor}', 'hasTorch': False, 'hasNemo': False, 'hasGrpc': False, 'hasCuda': False}",
+    "info = {'version': f'{sys.version_info.major}.{sys.version_info.minor}', 'hasTorch': False, 'hasNemo': False, 'hasGrpc': False, 'hasCuda': False, 'hasMlx': False}",
     "try:",
     "    import torch",
     "    info['hasTorch'] = True",
@@ -64,6 +66,9 @@ const getAllPythonInfo = (pythonPath: string): PythonCheckResult | null => {
     "except Exception: pass",
     "try:",
     "    import grpc; info['hasGrpc'] = True",
+    "except Exception: pass",
+    "try:",
+    "    import mlx_whisper; info['hasMlx'] = True",
     "except Exception: pass",
     "print(json.dumps(info))",
   ].join("\n");
@@ -87,7 +92,7 @@ const isValidPython = (version: string | null): boolean => {
   if (!Number.isFinite(major) || !Number.isFinite(minor)) {
     return false;
   }
-  return major === 3 && (minor === 11 || minor === 12);
+  return major === 3 && (minor === 11 || minor === 12 || minor === 13);
 };
 
 const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | null => {
@@ -96,7 +101,6 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
   }
 
   if (!checkDeps) {
-    // Quick check: just version
     const version = runPythonCheck(pythonPath, "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')");
     if (!isValidPython(version)) {
       return null;
@@ -108,10 +112,10 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
       hasNemo: false,
       hasGrpc: false,
       hasCuda: false,
+      hasMlx: false,
     };
   }
 
-  // Full check: version + all deps in one call
   const result = getAllPythonInfo(pythonPath);
   if (!result || !isValidPython(result.version)) {
     return null;
@@ -123,6 +127,7 @@ const getPythonInfo = (pythonPath: string, checkDeps: boolean): PythonInfo | nul
     hasNemo: result.hasNemo,
     hasGrpc: result.hasGrpc,
     hasCuda: result.hasCuda,
+    hasMlx: result.hasMlx,
   };
 };
 
@@ -154,10 +159,11 @@ const findEnvPython = (): string | null => {
 };
 
 const findVenvPython = (appRoot: string): string | null => {
+  const venvBin = process.platform === "win32" ? "Scripts/python.exe" : "bin/python";
   const searchPaths = [
-    path.join(appRoot, ".venv", "Scripts", "python.exe"),
-    path.join(appRoot, "..", ".venv", "Scripts", "python.exe"),
-    path.join(appRoot, "..", "..", ".venv", "Scripts", "python.exe"),
+    path.join(appRoot, ".venv", venvBin),
+    path.join(appRoot, "..", ".venv", venvBin),
+    path.join(appRoot, "..", "..", ".venv", venvBin),
   ];
   for (const candidate of searchPaths) {
     if (fs.existsSync(candidate)) {
@@ -169,14 +175,17 @@ const findVenvPython = (appRoot: string): string | null => {
 
 const findPathPython = (): string | null => {
   const command = process.platform === "win32" ? "where" : "which";
-  try {
-    const output = execFileSync(command, ["python"], { encoding: "utf-8" }).trim();
-    const first = output.split(/\r?\n/)[0];
-    if (first && fs.existsSync(first)) {
-      return first;
+  // Try python3 first (preferred on macOS/Linux), then python
+  for (const bin of ["python3", "python"]) {
+    try {
+      const output = execFileSync(command, [bin], { encoding: "utf-8" }).trim();
+      const first = output.split(/\r?\n/)[0];
+      if (first && fs.existsSync(first)) {
+        return first;
+      }
+    } catch {
+      continue;
     }
-  } catch {
-    return null;
   }
   return null;
 };
@@ -185,9 +194,9 @@ const findPyLauncher = (): string | null => {
   if (process.platform !== "win32") {
     return null;
   }
-  for (const version of ["3.12", "3.11"]) {
+  for (const version of ["3.13", "3.12", "3.11"]) {
     try {
-      const output = execFileSync("py", [`-${version}`, "-c", "import sys; print(sys.executable)"] , {
+      const output = execFileSync("py", [`-${version}`, "-c", "import sys; print(sys.executable)"], {
         encoding: "utf-8",
         windowsHide: true,
       }).trim();
@@ -202,14 +211,38 @@ const findPyLauncher = (): string | null => {
 };
 
 const findCommonInstall = (): string | null => {
+  if (process.platform === "darwin") {
+    // Homebrew (Apple Silicon and Intel) and pyenv locations
+    const candidates = [
+      "/opt/homebrew/bin/python3.13",
+      "/opt/homebrew/bin/python3.12",
+      "/opt/homebrew/bin/python3.11",
+      "/opt/homebrew/bin/python3",
+      "/usr/local/bin/python3.13",
+      "/usr/local/bin/python3.12",
+      "/usr/local/bin/python3.11",
+      "/usr/local/bin/python3",
+      `${process.env.HOME}/.pyenv/shims/python3`,
+    ];
+    for (const candidate of candidates) {
+      if (candidate && fs.existsSync(candidate)) {
+        return candidate;
+      }
+    }
+    return null;
+  }
+
   if (process.platform !== "win32") {
     return null;
   }
+
   const localAppData = process.env.LOCALAPPDATA ?? "";
   const candidates = [
     localAppData && path.join(localAppData, "Programs", "Python"),
+    "C:/Python313",
     "C:/Python312",
     "C:/Python311",
+    "C:/Program Files/Python313",
     "C:/Program Files/Python312",
     "C:/Program Files/Python311",
   ].filter(Boolean) as string[];
@@ -239,6 +272,15 @@ const findCommonInstall = (): string | null => {
   return null;
 };
 
+const isMacOS = process.platform === "darwin";
+
+const hasRequiredDeps = (info: PythonInfo): boolean => {
+  if (isMacOS) {
+    return info.hasMlx && info.hasGrpc;
+  }
+  return info.hasTorch && info.hasNemo && info.hasGrpc;
+};
+
 export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   const finders = [
     findEnvPython,
@@ -259,7 +301,7 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
     if (!info) {
       continue;
     }
-    if (!checkDeps || (info.hasTorch && info.hasNemo && info.hasGrpc)) {
+    if (!checkDeps || hasRequiredDeps(info)) {
       return info;
     }
     if (!found) {
@@ -268,13 +310,9 @@ export const findPython = (appRoot: string, checkDeps = true): PythonInfo => {
   }
 
   if (found) {
-    const missing = [
-      !found.hasTorch && "torch",
-      !found.hasNemo && "nemo",
-      !found.hasGrpc && "grpc",
-    ]
-      .filter(Boolean)
-      .join(", ");
+    const missing = isMacOS
+      ? [!found.hasMlx && "mlx-whisper", !found.hasGrpc && "grpcio"].filter(Boolean).join(", ")
+      : [!found.hasTorch && "torch", !found.hasNemo && "nemo", !found.hasGrpc && "grpcio"].filter(Boolean).join(", ");
     throw new BackendDepsError(
       `Python found but missing backend dependencies: ${missing}.`,
       found.executable,
@@ -291,7 +329,8 @@ export const installBackendDeps = (
   backendRoot: string,
   tempDir?: string,
 ): void => {
-  const requirements = path.join(backendRoot, "requirements.txt");
+  const reqFile = isMacOS ? "requirements-macos.txt" : "requirements.txt";
+  const requirements = path.join(backendRoot, reqFile);
   if (tempDir) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
@@ -351,15 +390,17 @@ export const installBackendDepsAsync = async (
   tempDir?: string,
   onOutput?: (line: string) => void,
 ): Promise<void> => {
-  const requirements = path.join(backendRoot, "requirements.txt");
+  const reqFile = isMacOS ? "requirements-macos.txt" : "requirements.txt";
+  const requirements = path.join(backendRoot, reqFile);
   if (tempDir) {
     fs.mkdirSync(tempDir, { recursive: true });
   }
 
-  // Install main requirements
   await runPipInstall(pythonPath, ["-r", requirements], tempDir, onOutput);
 
-  // Force numpy <2 to fix compatibility with torch/nemo compiled against numpy 1.x
-  onOutput?.("Ensuring numpy compatibility...");
-  await runPipInstall(pythonPath, ["numpy>=1.26.0,<2", "--force-reinstall"], tempDir, onOutput);
+  if (!isMacOS) {
+    // Force numpy <2 for torch/nemo compatibility on Windows/CUDA
+    onOutput?.("Ensuring numpy compatibility...");
+    await runPipInstall(pythonPath, ["numpy>=1.26.0,<2", "--force-reinstall"], tempDir, onOutput);
+  }
 };

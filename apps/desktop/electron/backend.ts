@@ -42,8 +42,10 @@ export const startBackend = (
     PYTHONUNBUFFERED: "1",
   };
 
-  if (options.mode) {
-    env.PARAKEY_MODE = options.mode;
+  // On macOS use MLX mode by default; allow explicit override via options
+  const mode = options.mode ?? (process.platform === "darwin" ? "mlx" : undefined);
+  if (mode) {
+    env.PARAKEY_MODE = mode;
   }
   if (options.device) {
     env.PARAKEY_DEVICE = options.device;
@@ -82,14 +84,12 @@ export const startBackend = (
 };
 
 export const ensureBackendDeps = (python: PythonInfo): void => {
-  if (!python.hasTorch || !python.hasNemo || !python.hasGrpc) {
-    const missing = [
-      !python.hasTorch && "torch",
-      !python.hasNemo && "nemo",
-      !python.hasGrpc && "grpc",
-    ]
-      .filter(Boolean)
-      .join(", ");
+  const isMacOS = process.platform === "darwin";
+  const missing = isMacOS
+    ? [!python.hasMlx && "mlx-whisper", !python.hasGrpc && "grpcio"].filter(Boolean).join(", ")
+    : [!python.hasTorch && "torch", !python.hasNemo && "nemo", !python.hasGrpc && "grpcio"].filter(Boolean).join(", ");
+
+  if (missing) {
     throw new BackendDepsError(
       `Python found but missing backend dependencies: ${missing}.`,
       python.executable,

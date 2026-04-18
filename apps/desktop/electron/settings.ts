@@ -2,7 +2,7 @@ import { app } from "electron";
 import fs from "node:fs";
 import path from "node:path";
 
-export type HotkeyPreset = "ctrl+alt" | "ctrl+shift" | "alt+shift" | "win+alt";
+export type HotkeyPreset = "ctrl+alt" | "ctrl+shift" | "alt+shift" | "win+alt" | "cmd+option";
 
 export type HotkeySettings = {
   preset: HotkeyPreset;
@@ -12,10 +12,11 @@ export type HotkeySettings = {
 
 // uIOhook keycodes for modifier keys
 export const HOTKEY_PRESETS: Record<HotkeyPreset, number[]> = {
-  "ctrl+alt": [29, 56],      // Ctrl + Alt
+  "ctrl+alt": [29, 56],      // Ctrl + Alt / Ctrl + Option
   "ctrl+shift": [29, 42],    // Ctrl + Shift
-  "alt+shift": [56, 42],     // Alt + Shift
-  "win+alt": [3675, 56],     // Win + Alt
+  "alt+shift": [56, 42],     // Alt + Shift / Option + Shift
+  "win+alt": [3675, 56],     // Win + Alt (Windows)
+  "cmd+option": [3675, 56],  // Cmd + Option (macOS) — same uiohook codes as win+alt
 };
 
 export type AudioSettings = {
@@ -50,10 +51,12 @@ export type AppSettings = {
   showNotifications: boolean;
 };
 
+const DEFAULT_HOTKEY: HotkeyPreset = process.platform === "darwin" ? "cmd+option" : "ctrl+alt";
+
 const DEFAULT_SETTINGS: AppSettings = {
   hotkey: {
-    preset: "ctrl+alt",
-    modifiers: HOTKEY_PRESETS["ctrl+alt"],
+    preset: DEFAULT_HOTKEY,
+    modifiers: HOTKEY_PRESETS[DEFAULT_HOTKEY],
     debounceMs: 40,
   },
   audio: {

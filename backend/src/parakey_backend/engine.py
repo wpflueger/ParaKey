@@ -1,4 +1,10 @@
-"""Inference engine for speech-to-text transcription."""
+"""Inference engine for speech-to-text transcription.
+
+Supports three modes:
+- 'nemo': NVIDIA Parakeet TDT via NeMo (requires CUDA)
+- 'mlx': Whisper via mlx-whisper (requires Apple Silicon)
+- 'mock': Deterministic mock for testing (no hardware required)
+"""
 
 from __future__ import annotations
 
@@ -6,7 +12,6 @@ import asyncio
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Optional
 
 from parakey_backend.config import BackendConfig
 
@@ -22,20 +27,73 @@ class EngineEvent:
     stability: float | None = None
 
 
-class InferenceEngine:
-    """Speech-to-text inference engine using NeMo Parakeet model.
+def generate_mock_events(
+    config: BackendConfig,
+    audio_frames: list[bytes],
+) -> list[EngineEvent]:
+    """Generate deterministic mock events for testing.
 
-    This engine handles real ASR inference using the NVIDIA Parakeet TDT
-    model. It uses a thread pool executor to run blocking inference calls
-    without blocking the async event loop.
+    Emits one partial event every ``config.partial_every_n_frames`` frames,
+    then a final event with ``config.final_text``.
     """
+    events: list[EngineEvent] = []
+
+    for i, _ in enumerate(audio_frames, 1):
+        if config.partial_every_n_frames > 0 and i % config.partial_every_n_frames == 0:
+            events.append(
+                EngineEvent(
+                    kind="partial",
+                    text=f"Partial {i // config.partial_every_n_frames}...",
+                    stability=0.7,
+                )
+            )
+
+    events.append(EngineEvent(kind="final", text=config.final_text))
+    return events
+
+
+class MockInferenceEngine:
+    """Deterministic mock engine for unit tests — no hardware required."""
 
     def __init__(self, config: BackendConfig) -> None:
-        """Initialize the inference engine.
+        self._config = config
+        self._loaded = False
 
-        Args:
-            config: Backend configuration.
-        """
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
+    @property
+    def device(self) -> str:
+        return "mock"
+
+    def load_model(self) -> None:
+        self._loaded = True
+        logger.info("Mock engine loaded")
+
+    def unload_model(self) -> None:
+        self._loaded = False
+        logger.info("Mock engine unloaded")
+
+    async def transcribe(self, audio_data: bytes, sample_rate: int = 16000) -> str:
+        if not self._loaded:
+            raise RuntimeError("Model not loaded - call load_model() first")
+        return self._config.final_text
+
+    async def process_audio_stream(
+        self,
+        audio_frames: list[bytes],
+        sample_rate: int = 16000,
+    ) -> list[EngineEvent]:
+        if not self._loaded:
+            raise RuntimeError("Model not loaded")
+        return generate_mock_events(self._config, audio_frames)
+
+
+class InferenceEngine:
+    """NeMo Parakeet TDT engine — requires CUDA."""
+
+    def __init__(self, config: BackendConfig) -> None:
         self._config = config
         self._model_loader = None
         self._executor = ThreadPoolExecutor(max_workers=1)
@@ -43,21 +101,15 @@ class InferenceEngine:
 
     @property
     def is_loaded(self) -> bool:
-        """Return True if the model is loaded."""
         return self._loaded
 
     @property
     def device(self) -> str:
-        """Return the device being used for inference."""
         if self._model_loader:
             return self._model_loader.device
         return "unknown"
 
     def load_model(self) -> None:
-        """Load the ASR model.
-
-        This should be called on server startup.
-        """
         if self._loaded:
             logger.info("Model already loaded")
             return
@@ -78,7 +130,6 @@ class InferenceEngine:
             raise
 
     def unload_model(self) -> None:
-        """Unload the model and free resources."""
         if self._model_loader:
             self._model_loader.unload()
             self._model_loader = None
@@ -86,37 +137,13 @@ class InferenceEngine:
         logger.info("Model unloaded")
 
     def _transcribe_sync(self, audio_data: bytes, sample_rate: int) -> str:
-        """Synchronously transcribe audio (runs in thread pool).
-
-        Args:
-            audio_data: Raw PCM audio bytes.
-            sample_rate: Sample rate of the audio.
-
-        Returns:
-            Transcribed text.
-        """
         if not self._loaded or self._model_loader is None:
             raise RuntimeError("Model not loaded")
-
         return self._model_loader.transcribe(audio_data, sample_rate)
 
-    async def transcribe(
-        self,
-        audio_data: bytes,
-        sample_rate: int = 16000,
-    ) -> str:
-        """Asynchronously transcribe audio.
-
-        Args:
-            audio_data: Raw PCM audio bytes (16-bit signed).
-            sample_rate: Sample rate of the audio.
-
-        Returns:
-            Transcribed text.
-        """
+    async def transcribe(self, audio_data: bytes, sample_rate: int = 16000) -> str:
         if not self._loaded:
             raise RuntimeError("Model not loaded - call load_model() first")
-
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(
             self._executor,
@@ -130,22 +157,7 @@ class InferenceEngine:
         audio_frames: list[bytes],
         sample_rate: int = 16000,
     ) -> list[EngineEvent]:
-        """Process a stream of audio frames and generate events.
-
-        This concatenates all audio frames and performs a single
-        transcription, generating a status event before processing
-        and a final event with the result.
-
-        Args:
-            audio_frames: List of audio frame bytes.
-            sample_rate: Sample rate of the audio.
-
-        Returns:
-            List of engine events.
-        """
         events: list[EngineEvent] = []
-
-        # Concatenate all audio frames
         audio_data = b"".join(audio_frames)
 
         if len(audio_data) == 0:
@@ -155,57 +167,123 @@ class InferenceEngine:
         events.append(EngineEvent(kind="status", text="Transcribing..."))
 
         try:
-            # Perform transcription
             transcript = await self.transcribe(audio_data, sample_rate)
-
-            # Add final event
             events.append(EngineEvent(kind="final", text=transcript.strip()))
 
         except RuntimeError as e:
             error_str = str(e).lower()
             if "cuda" in error_str and ("out of memory" in error_str or "oom" in error_str):
                 logger.error("CUDA out of memory during transcription")
-                events.append(
-                    EngineEvent(
-                        kind="error",
-                        text="Transcription failed: CUDA out of memory",
-                    )
-                )
+                events.append(EngineEvent(kind="error", text="Transcription failed: CUDA out of memory"))
             else:
                 logger.error(f"Transcription failed: {e}")
-                events.append(
-                    EngineEvent(
-                        kind="error",
-                        text=f"Transcription failed: {e}",
-                    )
-                )
+                events.append(EngineEvent(kind="error", text=f"Transcription failed: {e}"))
 
         except Exception as e:
             logger.error(f"Transcription failed: {e}")
-            events.append(
-                EngineEvent(
-                    kind="error",
-                    text=f"Transcription failed: {e}",
-                )
-            )
+            events.append(EngineEvent(kind="error", text=f"Transcription failed: {e}"))
 
         return events
 
 
-def create_engine(config: BackendConfig) -> InferenceEngine:
-    """Create an inference engine based on configuration.
+class MLXInferenceEngine:
+    """MLX Whisper engine — requires Apple Silicon (macOS 13.3+)."""
 
-    Args:
-        config: Backend configuration.
+    def __init__(self, config: BackendConfig) -> None:
+        self._config = config
+        self._model_loader = None
+        self._executor = ThreadPoolExecutor(max_workers=1)
+        self._loaded = False
 
-    Returns:
-        An inference engine instance.
-    """
+    @property
+    def is_loaded(self) -> bool:
+        return self._loaded
+
+    @property
+    def device(self) -> str:
+        return "mlx"
+
+    def load_model(self) -> None:
+        if self._loaded:
+            logger.info("MLX model already loaded")
+            return
+
+        try:
+            from parakey_backend.model import MLXModelLoader
+
+            self._model_loader = MLXModelLoader(model_name=self._config.model_name)
+            self._model_loader.load()
+            self._loaded = True
+            logger.info("MLX inference engine ready")
+
+        except Exception as e:
+            logger.error(f"Failed to load MLX model: {e}")
+            raise
+
+    def unload_model(self) -> None:
+        if self._model_loader:
+            self._model_loader.unload()
+            self._model_loader = None
+        self._loaded = False
+        logger.info("MLX model unloaded")
+
+    def _transcribe_sync(self, audio_data: bytes, sample_rate: int) -> str:
+        if not self._loaded or self._model_loader is None:
+            raise RuntimeError("Model not loaded")
+        return self._model_loader.transcribe(audio_data, sample_rate)
+
+    async def transcribe(self, audio_data: bytes, sample_rate: int = 16000) -> str:
+        if not self._loaded:
+            raise RuntimeError("Model not loaded - call load_model() first")
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            self._executor,
+            self._transcribe_sync,
+            audio_data,
+            sample_rate,
+        )
+
+    async def process_audio_stream(
+        self,
+        audio_frames: list[bytes],
+        sample_rate: int = 16000,
+    ) -> list[EngineEvent]:
+        events: list[EngineEvent] = []
+        audio_data = b"".join(audio_frames)
+
+        if len(audio_data) == 0:
+            events.append(EngineEvent(kind="final", text=""))
+            return events
+
+        events.append(EngineEvent(kind="status", text="Transcribing..."))
+
+        try:
+            transcript = await self.transcribe(audio_data, sample_rate)
+            events.append(EngineEvent(kind="final", text=transcript.strip()))
+
+        except Exception as e:
+            logger.error(f"MLX transcription failed: {e}")
+            events.append(EngineEvent(kind="error", text=f"Transcription failed: {e}"))
+
+        return events
+
+
+def create_engine(
+    config: BackendConfig,
+) -> InferenceEngine | MLXInferenceEngine | MockInferenceEngine:
+    """Create an inference engine based on the configured mode."""
+    if config.mode == "mock":
+        return MockInferenceEngine(config)
+    if config.mode == "mlx":
+        return MLXInferenceEngine(config)
     return InferenceEngine(config)
 
 
 __all__ = [
     "EngineEvent",
     "InferenceEngine",
+    "MLXInferenceEngine",
+    "MockInferenceEngine",
     "create_engine",
+    "generate_mock_events",
 ]

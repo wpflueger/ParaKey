@@ -14,11 +14,12 @@ export const BACKEND_ROOT = path.join(RESOURCES_ROOT, "backend");
 export const SHARED_ROOT = path.join(RESOURCES_ROOT, "shared");
 
 export const ELECTRON_DIR = path.join(APP_ROOT, "electron");
+// HuggingFace Hub cache — used by both NeMo (Windows) and mlx-whisper (macOS)
 export const PYTHON_CACHE_PATH = path.join(
 	os.homedir(),
 	".cache",
 	"huggingface",
-	"transformers",
+	"hub",
 );
 
 export const ELECTRON_DIST = path.join(APP_ROOT, "dist-electron");

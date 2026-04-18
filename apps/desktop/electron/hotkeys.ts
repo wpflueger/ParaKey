@@ -33,8 +33,12 @@ const updateHotkeyConfig = (preset: HotkeyPreset) => {
       key2Codes = MODIFIER_VARIANTS[42]; // Shift
       break;
     case "win+alt":
-      key1Codes = MODIFIER_VARIANTS[3675]; // Win
-      key2Codes = MODIFIER_VARIANTS[56];   // Alt
+      key1Codes = MODIFIER_VARIANTS[3675]; // Win (Windows) / Cmd (macOS)
+      key2Codes = MODIFIER_VARIANTS[56];   // Alt / Option
+      break;
+    case "cmd+option":
+      key1Codes = MODIFIER_VARIANTS[3675]; // Cmd (macOS) — same uiohook code as Win
+      key2Codes = MODIFIER_VARIANTS[56];   // Option
       break;
   }
 };

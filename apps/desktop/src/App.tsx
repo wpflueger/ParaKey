@@ -15,6 +15,8 @@ const formatHotkey = (preset: HotkeyPreset): string => {
       return "Alt+Shift";
     case "win+alt":
       return "Win+Alt";
+    case "cmd+option":
+      return "Cmd+Option";
     default:
       return "Ctrl+Alt";
   }
@@ -310,6 +312,7 @@ function App() {
                     <option value="ctrl+shift">Ctrl + Shift</option>
                     <option value="alt+shift">Alt + Shift</option>
                     <option value="win+alt">Win + Alt</option>
+                    <option value="cmd+option">Cmd + Option (macOS)</option>
                   </select>
                 </label>
                 <p className="subtle">Hold the shortcut to record, release to transcribe.</p>

@@ -13,6 +13,7 @@
     "build:electron": "tsup && node -e \"require('fs').copyFileSync('electron/overlay.html', 'dist-electron/overlay.html')\"",
     "build": "bun run build:renderer && bun run build:electron",
     "dist": "bun run build && electron-builder --win",
+    "dist:mac": "bun run build && electron-builder --mac",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
@@ -68,6 +69,10 @@
         "to": "backend/requirements.txt"
       },
       {
+        "from": "../../backend/requirements-macos.txt",
+        "to": "backend/requirements-macos.txt"
+      },
+      {
         "from": "../../shared/src",
         "to": "shared/src"
       },
@@ -87,6 +92,14 @@
     "nsis": {
       "installerIcon": "public/icons/app.ico",
       "uninstallerIcon": "public/icons/app.ico"
+    },
+    "mac": {
+      "icon": "public/icons/app_32.png",
+      "target": [{"target": "dmg", "arch": ["arm64"]}],
+      "category": "public.app-category.productivity"
+    },
+    "dmg": {
+      "sign": false
     },
     "publish": {
       "provider": "github",
